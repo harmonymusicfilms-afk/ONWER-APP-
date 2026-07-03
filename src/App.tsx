@@ -28,7 +28,7 @@ import {
 
 import { dbMock } from './lib/dbMock';
 import { syncManager, SyncOperation } from './lib/syncManager';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { Owner, Shop, ScreenType, Booking, Customer, Service, Staff } from './types';
 
 // Modular Components
@@ -53,6 +53,12 @@ export default function App() {
 
   // Supabase Auth Listener
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setSessionLoading(false);
+      setScreen('login');
+      return;
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         await handleRoleBasedRouting(session.user.id, session.user.email || '');
@@ -71,7 +77,7 @@ export default function App() {
 
   const handleRoleBasedRouting = async (userId: string, email: string) => {
     try {
-      // 1. Fetch Profile and Role
+      // 1. Fetch Profile and Role - Validate auth.uid() == owner_id implicitly by using userId from session
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -95,13 +101,13 @@ export default function App() {
 
       // 2. ROLE ROUTING LOGIC
       if (role === 'customer') {
-        window.location.href = 'https://nexora.in/customer-app'; // Redirect to Customer App
+        window.location.href = 'https://nexora.in/customer-app';
         return;
       } else if (role === 'super_admin') {
-        window.location.href = 'https://nexora.in/admin-dashboard'; // Redirect to Admin Dashboard
+        window.location.href = 'https://nexora.in/admin-dashboard';
         return;
       } else if (role === 'partner') {
-        window.location.href = 'https://nexora.in/partner-dashboard'; // Redirect to Partner Dashboard
+        window.location.href = 'https://nexora.in/partner-dashboard';
         return;
       } else if (role !== 'shop_owner') {
         setScreen('unauthorized');
@@ -109,7 +115,7 @@ export default function App() {
         return;
       }
 
-      // 3. User is shop_owner, prepare owner object
+      // 3. User is shop_owner, prepare owner session object
       const ownerObj: Owner = {
         id: userId,
         email: email,
@@ -120,41 +126,44 @@ export default function App() {
       setOwner(ownerObj);
       dbMock.setLoggedInOwner(ownerObj);
 
-      // 4. Fetch Shops for this owner
+      // 4. Fetch Shops for this owner - Strict Validation: owner belongs to requested shop_id
       const { data: shops, error: shopsError } = await supabase
         .from('shops')
-        .select('*')
+        .select('id, owner_id, name, type, category, address, phone, rating, upi_id')
         .eq('owner_id', userId);
 
       if (shopsError) {
         console.error('Error fetching shops:', shopsError);
       }
 
-      const ownerShops = shops || [];
+      const ownerShops = (shops || []) as any[];
 
-      // Update URL logic based on shops
+      // 5. URL Parameter Validation - Never rely only on URL parameters
       const path = window.location.pathname;
       const match = path.match(/^\/owner-app\/([a-zA-Z0-9-_]+)/);
 
       if (match && match[1]) {
         const targetShopId = match[1];
+        // Validate: Does the authenticated user own the shop in the URL?
         const matchedShop = ownerShops.find(s => s.id === targetShopId);
         if (matchedShop) {
-          setActiveShop(matchedShop as any);
+          // Shop ID in URL is valid and owned by this user
+          setActiveShop(matchedShop);
           dbMock.setActiveShopId(matchedShop.id);
           setScreen('home');
         } else {
+          // Attempted access to a shop not owned by the user
+          console.warn(`Unauthorized access attempt to shop_id: ${targetShopId}`);
           setScreen('unauthorized');
         }
       } else if (ownerShops.length === 1) {
-        setActiveShop(ownerShops[0] as any);
+        // No shop in URL, but owner has exactly one shop - auto-select and route
+        setActiveShop(ownerShops[0]);
         dbMock.setActiveShopId(ownerShops[0].id);
         setScreen('home');
         window.history.replaceState({}, '', `/owner-app/${ownerShops[0].id}`);
-      } else if (ownerShops.length > 1) {
-        setScreen('shop_selection');
       } else {
-        // No shops found, let them select or create
+        // Multiple shops or no shops - go to selection
         setScreen('shop_selection');
       }
     } catch (err) {
@@ -319,6 +328,9 @@ export default function App() {
     // Pull fresh data from cloud on shop select
     syncManager.pullFromCloud(activeShop.id);
 
+    // Subscribe to realtime changes
+    const unsubscribe = syncManager.subscribeToChanges(activeShop.id);
+
     const checkBookingsForAlerts = () => {
       try {
         const bookings = dbMock.getBookings(activeShop.id);
@@ -390,6 +402,7 @@ export default function App() {
 
     return () => {
       clearInterval(interval);
+      unsubscribe();
       window.removeEventListener('bookings-changed', checkBookingsForAlerts);
     };
   }, [activeShop]);

@@ -533,6 +533,9 @@ export const dbMock = {
     const current = dbMock.getServicesRaw();
     const filtered = current.filter(s => !(s.id === serviceId && s.shop_id === shopId));
     localStorage.setItem(KEYS.SERVICES, JSON.stringify(filtered));
+    if (onMutationCallback) {
+      onMutationCallback('delete_service', shopId, { id: serviceId }, `Delete Service`);
+    }
   },
 
   // Staff mutations
@@ -571,6 +574,9 @@ export const dbMock = {
     const current = dbMock.getStaffRaw();
     const filtered = current.filter(s => !(s.id === staffId && s.shop_id === shopId));
     localStorage.setItem(KEYS.STAFF, JSON.stringify(filtered));
+    if (onMutationCallback) {
+      onMutationCallback('delete_staff', shopId, { id: staffId }, `Delete Staff`);
+    }
   },
 
   // Block slots mutations
@@ -611,6 +617,9 @@ export const dbMock = {
     const current = dbMock.getBlockedSlotsRaw();
     const filtered = current.filter(s => !(s.id === slotId && s.shop_id === shopId));
     localStorage.setItem(KEYS.BLOCKED_SLOTS, JSON.stringify(filtered));
+    if (onMutationCallback) {
+      onMutationCallback('delete_blocked_slot', shopId, { id: slotId }, `Delete Blocked Slot`);
+    }
   },
 
   // Bookings mutations
@@ -803,6 +812,9 @@ export const dbMock = {
     if (target) {
       target.is_read = true;
       localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(current));
+      if (onMutationCallback) {
+        onMutationCallback('mark_notification_read', shopId, { id }, `Mark Notification as Read`);
+      }
     }
   },
 
@@ -814,12 +826,18 @@ export const dbMock = {
       }
     });
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(current));
+    if (onMutationCallback) {
+      onMutationCallback('read_all_notifications', shopId, {}, `Mark All Notifications as Read`);
+    }
   },
 
   deleteNotification: (shopId: string, id: string) => {
     const current = dbMock.getNotificationsRaw();
     const filtered = current.filter(n => !(n.id === id && n.shop_id === shopId));
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(filtered));
+    if (onMutationCallback) {
+      onMutationCallback('delete_notification', shopId, { id }, `Delete Notification`);
+    }
   },
 
   getWallet: (shopId: string) => {
@@ -833,6 +851,9 @@ export const dbMock = {
     if (shopIdx > -1) {
       shops[shopIdx] = { ...shops[shopIdx], ...data };
       localStorage.setItem(KEYS.SHOPS, JSON.stringify(shops));
+      if (onMutationCallback) {
+        onMutationCallback('save_shop', shopId, shops[shopIdx], `Update Shop Profile`);
+      }
       return shops[shopIdx];
     }
     throw new Error('Shop not found');

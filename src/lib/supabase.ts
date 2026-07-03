@@ -1,13 +1,29 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+let supabaseInstance: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase URL or Anon Key missing. Auth features may not work.');
-}
+export const isSupabaseConfigured = (): boolean => {
+  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+};
 
-export const supabase = createClient(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
-);
+export const getSupabase = (): SupabaseClient => {
+  if (!supabaseInstance) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      // In development, we might not want to crash everything if keys are missing
+      // but the user's specific error was that createClient was called with invalid args.
+      throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required.');
+    }
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return supabaseInstance;
+};
+
+// Deprecated: Use getSupabase() instead. Keeping this as a throwing proxy to catch top-level usage
+export const supabase = new Proxy({} as SupabaseClient, {
+  get: (_, prop) => {
+    return (getSupabase() as any)[prop];
+  }
+});

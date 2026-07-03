@@ -1,9 +1,9 @@
 import { dbMock } from './dbMock';
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 export interface SyncOperation {
   id: string;
-  type: 'save_booking' | 'save_service' | 'save_staff' | 'add_blocked_slot' | 'update_booking_status' | 'save_customer';
+  type: 'save_booking' | 'save_service' | 'delete_service' | 'save_staff' | 'delete_staff' | 'add_blocked_slot' | 'delete_blocked_slot' | 'update_booking_status' | 'save_customer' | 'save_shop' | 'delete_notification' | 'read_all_notifications' | 'mark_notification_read';
   shopId: string;
   payload: any;
   timestamp: string;
@@ -76,6 +76,11 @@ export const syncManager = {
     const queue = syncManager.getQueue().filter(op => op.shopId === shopId);
     if (queue.length === 0) return 0;
 
+    if (!isSupabaseConfigured()) {
+      console.warn('Supabase not configured, skipping sync.');
+      return 0;
+    }
+
     // Process each operation against Supabase
     for (const op of queue) {
       try {
@@ -90,20 +95,67 @@ export const syncManager = {
             .from('services')
             .upsert({ ...op.payload, shop_id: op.shopId });
           error = err;
+        } else if (op.type === 'delete_service') {
+          const { error: err } = await supabase
+            .from('services')
+            .delete()
+            .eq('id', op.payload.id)
+            .eq('shop_id', op.shopId);
+          error = err;
         } else if (op.type === 'save_staff') {
           const { error: err } = await supabase
             .from('staff')
             .upsert({ ...op.payload, shop_id: op.shopId });
+          error = err;
+        } else if (op.type === 'delete_staff') {
+          const { error: err } = await supabase
+            .from('staff')
+            .delete()
+            .eq('id', op.payload.id)
+            .eq('shop_id', op.shopId);
           error = err;
         } else if (op.type === 'add_blocked_slot') {
           const { error: err } = await supabase
             .from('blocked_time_slots')
             .insert({ ...op.payload, shop_id: op.shopId });
           error = err;
+        } else if (op.type === 'delete_blocked_slot') {
+          const { error: err } = await supabase
+            .from('blocked_time_slots')
+            .delete()
+            .eq('id', op.payload.id)
+            .eq('shop_id', op.shopId);
+          error = err;
         } else if (op.type === 'save_customer') {
           const { error: err } = await supabase
             .from('customers')
             .upsert({ ...op.payload, shop_id: op.shopId });
+          error = err;
+        } else if (op.type === 'save_shop') {
+          const { error: err } = await supabase
+            .from('shops')
+            .update(op.payload)
+            .eq('id', op.shopId);
+          error = err;
+        } else if (op.type === 'delete_notification') {
+          const { error: err } = await supabase
+            .from('notifications')
+            .delete()
+            .eq('id', op.payload.id)
+            .eq('shop_id', op.shopId);
+          error = err;
+        } else if (op.type === 'read_all_notifications') {
+          const { error: err } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('shop_id', op.shopId);
+          error = err;
+        } else if (op.type === 'mark_notification_read') {
+          const { error: err } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('id', op.payload.id)
+            .eq('shop_id', op.shopId);
           error = err;
         }
 
@@ -136,24 +188,37 @@ export const syncManager = {
 
   // Pull data from Supabase to refresh LocalStorage cache
   pullFromCloud: async (shopId: string) => {
-    if (syncManager.isOffline()) return;
+    if (syncManager.isOffline() || !isSupabaseConfigured()) return;
 
     try {
-      // Fetch all relevant data in parallel
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const userId = session.user.id;
+
+      // Fetch all relevant data in parallel with strict shop_id filtering
       const [
         { data: bookings },
         { data: services },
         { data: staff },
         { data: customers },
         { data: blockedSlots },
-        { data: notifications }
+        { data: notifications },
+        { data: wallet },
+        { data: reviews },
+        { data: withdrawals },
+        { data: transactions }
       ] = await Promise.all([
         supabase.from('bookings').select('*').eq('shop_id', shopId),
         supabase.from('services').select('*').eq('shop_id', shopId),
         supabase.from('staff').select('*').eq('shop_id', shopId),
         supabase.from('customers').select('*').eq('shop_id', shopId),
         supabase.from('blocked_time_slots').select('*').eq('shop_id', shopId),
-        supabase.from('notifications').select('*').eq('shop_id', shopId)
+        supabase.from('notifications').select('*').eq('shop_id', shopId),
+        supabase.from('salon_wallets').select('*').eq('shop_id', shopId).single(),
+        supabase.from('reviews').select('*').eq('shop_id', shopId),
+        supabase.from('withdrawals').select('*').eq('shop_id', shopId),
+        supabase.from('wallet_transactions').select('*').eq('shop_id', shopId)
       ]);
 
       // Seed dbMock cache with this data
@@ -163,11 +228,73 @@ export const syncManager = {
       if (customers) localStorage.setItem(`nexora_customers`, JSON.stringify(customers));
       if (blockedSlots) localStorage.setItem(`nexora_blocked_slots`, JSON.stringify(blockedSlots));
       if (notifications) localStorage.setItem(`nexora_notifications`, JSON.stringify(notifications));
+      
+      // For wallets and reviews, we merge into the global lists or handle specifically
+      if (wallet) {
+        const wallets = JSON.parse(localStorage.getItem('nexora_wallets') || '[]');
+        const idx = wallets.findIndex((w: any) => w.shop_id === shopId);
+        if (idx > -1) wallets[idx] = wallet;
+        else wallets.push(wallet);
+        localStorage.setItem('nexora_wallets', JSON.stringify(wallets));
+      }
+      
+      if (reviews) {
+        const allReviews = JSON.parse(localStorage.getItem('nexora_reviews') || '[]');
+        // Filter out old reviews for this shop and add new ones
+        const filtered = allReviews.filter((r: any) => r.shop_id !== shopId);
+        localStorage.setItem('nexora_reviews', JSON.stringify([...filtered, ...reviews]));
+      }
+
+      if (transactions) {
+        const allTxs = JSON.parse(localStorage.getItem('nexora_transactions') || '[]');
+        const filtered = allTxs.filter((t: any) => t.shop_id !== shopId);
+        localStorage.setItem('nexora_transactions', JSON.stringify([...filtered, ...transactions]));
+      }
 
       window.dispatchEvent(new Event('bookings-changed'));
+      window.dispatchEvent(new Event('wallet-changed'));
+      window.dispatchEvent(new Event('notifications-changed'));
     } catch (err) {
       console.error('Error pulling from cloud:', err);
     }
+  },
+
+  // Realtime Subscriptions
+  subscribeToChanges: (shopId: string) => {
+    if (!isSupabaseConfigured()) return () => {};
+
+    const channel = supabase
+      .channel(`shop-changes-${shopId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings', filter: `shop_id=eq.${shopId}` },
+        () => syncManager.pullFromCloud(shopId)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `shop_id=eq.${shopId}` },
+        () => syncManager.pullFromCloud(shopId)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reviews', filter: `shop_id=eq.${shopId}` },
+        () => syncManager.pullFromCloud(shopId)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'salon_wallets', filter: `shop_id=eq.${shopId}` },
+        () => syncManager.pullFromCloud(shopId)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'withdrawals', filter: `shop_id=eq.${shopId}` },
+        () => syncManager.pullFromCloud(shopId)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 };
 

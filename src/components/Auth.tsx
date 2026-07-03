@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Store, ShieldAlert, KeyRound, Mail, User, Phone, LogIn, UserPlus, Building2, MapPin } from 'lucide-react';
 import { dbMock } from '../lib/dbMock';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Owner } from '../types';
 
 interface AuthProps {
@@ -53,6 +53,12 @@ export default function Auth({ mode, onAuthSuccess, onSwitchMode, onClearSession
     setLoading(true);
     setError('');
 
+    if (!isSupabaseConfigured()) {
+      setError('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -84,6 +90,12 @@ export default function Auth({ mode, onAuthSuccess, onSwitchMode, onClearSession
     }
     setLoading(true);
     setError('');
+
+    if (!isSupabaseConfigured()) {
+      setError('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables.');
+      setLoading(false);
+      return;
+    }
 
     try {
       // 1. Sign up user
