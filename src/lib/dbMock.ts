@@ -12,7 +12,9 @@ import {
   Customer,
   BlockedSlot,
   WalletTransaction,
-  AppNotification
+  AppNotification,
+  Review,
+  SalonWallet
 } from '../types';
 
 // Helper to generate IDs
@@ -29,7 +31,9 @@ const KEYS = {
   BLOCKED_SLOTS: 'nexora_blocked_slots',
   TRANSACTIONS: 'nexora_transactions',
   NOTIFICATIONS: 'nexora_notifications',
-  ACTIVE_SHOP_ID: 'nexora_active_shop_id'
+  ACTIVE_SHOP_ID: 'nexora_active_shop_id',
+  WALLETS: 'nexora_wallets',
+  REVIEWS: 'nexora_reviews'
 };
 
 // Initial Data Seeds
@@ -38,7 +42,8 @@ const seedOwners: Owner[] = [
     id: 'owner-1',
     email: 'harmonymusicfilms@gmail.com',
     name: 'Sanjeev Kumar',
-    phone: '+91 98765 43210'
+    phone: '+91 98765 43210',
+    role: 'shop_owner'
   }
 ];
 
@@ -48,22 +53,34 @@ const seedShops: Shop[] = [
     owner_id: 'owner-1',
     name: 'Looks Luxury Salon',
     type: 'Salon & Grooming',
+    category: 'Premium Unisex Salon',
     address: 'Block C, Sector 62, Noida, UP - 201301',
+    city: 'Noida',
+    area: 'Sector 62',
     phone: '+91 98123 45678',
     rating: 4.8,
     qr_code_url: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=looksowner@oksbi%26pn=Looks%20Luxury%20Salon%26am=0%26cu=INR',
-    upi_id: 'looksowner@oksbi'
+    upi_id: 'looksowner@oksbi',
+    opening_time: '09:00 AM',
+    closing_time: '09:00 PM',
+    is_active: true
   },
   {
     id: 'shop-2',
     owner_id: 'owner-1',
     name: 'Rejuvenate Wellness Spa',
     type: 'Spa & Wellness',
+    category: 'Luxury Wellness Center',
     address: 'DLF Phase 3, Sector 24, Gurugram, Haryana - 122002',
+    city: 'Gurugram',
+    area: 'DLF Phase 3',
     phone: '+91 98234 56789',
     rating: 4.9,
     qr_code_url: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=rejuvenatespa@okaxis%26pn=Rejuvenate%20Spa%26am=0%26cu=INR',
-    upi_id: 'rejuvenatespa@okaxis'
+    upi_id: 'rejuvenatespa@okaxis',
+    opening_time: '10:00 AM',
+    closing_time: '10:00 PM',
+    is_active: true
   }
 ];
 
@@ -93,8 +110,10 @@ const seedStaff: Staff[] = [
 const seedCustomers: Customer[] = [
   { id: 'cust-1', shop_id: 'shop-1', name: 'Rohan Sharma', phone: '+91 98989 12345', email: 'rohan.sharma@gmail.com', total_bookings: 8, total_spent: 3100, last_visit_date: '2026-06-28', notes: 'Prefers tea. Always books Amit.' },
   { id: 'cust-2', shop_id: 'shop-1', name: 'Ananya Roy', phone: '+91 98888 23456', email: 'ananya.roy@yahoo.com', total_bookings: 3, total_spent: 3600, last_visit_date: '2026-06-30', notes: 'Sensitive skin. Prefers Pooja.' },
-  { id: 'cust-3', shop_id: 'shop-1', name: 'Vikram Singh', phone: '+91 98777 34567', email: 'vikram.singh@gmail.com', total_bookings: 5, total_spent: 1250, last_visit_date: '2026-07-01', notes: 'Quick haircuts only.' },
-  { id: 'cust-4', shop_id: 'shop-2', name: 'Priya Sen', phone: '+91 98666 45678', email: 'priya.sen@outlook.com', total_bookings: 12, total_spent: 24000, last_visit_date: '2026-06-25', notes: 'Prefers Maya, warm herbal tea.' }
+  { id: 'cust-3', shop_id: 'shop-1', name: 'Vikram Singh', phone: '+91 98777 34567', email: 'vikram.singh@gmail.com', total_bookings: 2, total_spent: 300, last_visit_date: '2026-07-01', notes: 'Quick haircuts only.' },
+  { id: 'cust-4', shop_id: 'shop-2', name: 'Priya Sen', phone: '+91 98666 45678', email: 'priya.sen@outlook.com', total_bookings: 12, total_spent: 24000, last_visit_date: '2026-06-25', notes: 'Prefers Maya, warm herbal tea.' },
+  { id: 'cust-5', shop_id: 'shop-1', name: 'Arjun Mehra', phone: '+91 99999 88888', total_bookings: 15, total_spent: 7500, last_visit_date: '2026-07-02', notes: 'VIP client' },
+  { id: 'cust-6', shop_id: 'shop-1', name: 'Karan Johar', phone: '+91 99123 00000', total_bookings: 1, total_spent: 1500, last_visit_date: '2026-07-02', notes: 'New high spender' }
 ];
 
 // Dynamically generate dates relative to "today" (2026-07-02)
@@ -222,21 +241,33 @@ const seedBlockedSlots: BlockedSlot[] = [
     date: '2026-07-02',
     start_time: '11:00',
     end_time: '12:00',
-    reason: 'Lunch break'
+    reason: 'Lunch break',
+    is_active: true,
+    created_by: 'owner-1',
+    created_at: '2026-07-02T09:00:00Z'
   }
 ];
 
 const seedTransactions: WalletTransaction[] = [
-  { id: 'tx-1', shop_id: 'shop-1', amount: 350, type: 'credit', method: 'upi', status: 'success', booking_id: 'b-1', description: 'Classic Haircut - Rohan Sharma', created_at: '2026-07-02T10:45:00Z' },
-  { id: 'tx-2', shop_id: 'shop-1', amount: 1500, type: 'credit', method: 'upi', status: 'success', description: 'Advance booking deposit', created_at: '2026-07-01T18:00:00Z' },
-  { id: 'tx-3', shop_id: 'shop-1', amount: 1000, type: 'debit', method: 'payout', status: 'success', description: 'Bank Payout to Sanjeev Kumar', created_at: '2026-06-30T10:00:00Z' },
-  { id: 'tx-4', shop_id: 'shop-2', amount: 2000, type: 'credit', method: 'upi', status: 'success', booking_id: 'b-6', description: 'Swedish Massage - Priya Sen', created_at: '2026-07-02T15:05:00Z' }
+  { id: 'tx-1', shop_id: 'shop-1', amount: 350, commission: 35, owner_amount: 315, type: 'credit', method: 'upi', status: 'success', booking_id: 'b-1', customer_name: 'Rohan Sharma', description: 'Classic Haircut - Rohan Sharma', created_at: '2026-07-02T10:45:00Z' },
+  { id: 'tx-2', shop_id: 'shop-1', amount: 1500, commission: 150, owner_amount: 1350, type: 'credit', method: 'upi', status: 'success', customer_name: 'Walk-in', description: 'Advance booking deposit', created_at: '2026-07-01T18:00:00Z' },
+  { id: 'tx-3', shop_id: 'shop-1', amount: 1000, commission: 0, owner_amount: 1000, type: 'debit', method: 'payout', status: 'success', description: 'Bank Payout to Sanjeev Kumar', created_at: '2026-06-30T10:00:00Z' },
+  { id: 'tx-4', shop_id: 'shop-2', amount: 2000, commission: 200, owner_amount: 1800, type: 'credit', method: 'upi', status: 'success', booking_id: 'b-6', customer_name: 'Priya Sen', description: 'Swedish Massage - Priya Sen', created_at: '2026-07-02T15:05:00Z' }
+];
+
+const seedWallets = [
+  { shop_id: 'shop-1', total_earned: 5650, pending_settlement: 1665, last_payout_amount: 1000, last_payout_date: '2026-06-30' },
+  { shop_id: 'shop-2', total_earned: 2000, pending_settlement: 1800, last_payout_amount: 0, last_payout_date: '' }
 ];
 
 const seedNotifications: AppNotification[] = [
-  { id: 'nt-1', shop_id: 'shop-1', title: 'New Booking Recieved', message: 'Vikram Singh booked Beard Grooming with Rahul at 02:00 PM', type: 'booking_new', is_read: false, created_at: '2026-07-02T09:15:00Z' },
+  { id: 'nt-1', shop_id: 'shop-1', title: 'New Booking Recieved', message: 'Vikram Singh booked Beard Grooming with Rahul at 02:00 PM', type: 'new_booking', is_read: false, created_at: '2026-07-02T09:15:00Z' },
   { id: 'nt-2', shop_id: 'shop-1', title: 'Payment Confirmed', message: 'Received ₹350 via UPI from Rohan Sharma (Classic Haircut)', type: 'payment_received', is_read: true, created_at: '2026-07-02T10:45:00Z' },
-  { id: 'nt-3', shop_id: 'shop-1', title: 'Booking Request Rescheduled', message: 'Ananya Roy shifted face massage to 12:30 PM today', type: 'booking_new', is_read: true, created_at: '2026-07-01T15:20:00Z' }
+  { id: 'nt-3', shop_id: 'shop-1', title: 'Booking Request Rescheduled', message: 'Ananya Roy shifted face massage to 12:30 PM today', type: 'new_booking', is_read: true, created_at: '2026-07-01T15:20:00Z' }
+];
+
+const seedReviews: Review[] = [
+  { id: 'rev-1', shop_id: 'shop-1', customer_id: 'cust-1', customer_name: 'Rohan Sharma', rating: 5, comment: 'Excellent service by Amit!', created_at: '2026-06-30T10:00:00Z' }
 ];
 
 // Setup default DB values if they do not exist
@@ -265,6 +296,12 @@ const initDB = () => {
   if (!localStorage.getItem(KEYS.NOTIFICATIONS)) {
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(seedNotifications));
   }
+  if (!localStorage.getItem(KEYS.WALLETS)) {
+    localStorage.setItem(KEYS.WALLETS, JSON.stringify(seedWallets));
+  }
+  if (!localStorage.getItem(KEYS.REVIEWS)) {
+    localStorage.setItem(KEYS.REVIEWS, JSON.stringify(seedReviews));
+  }
   // Let's pre-load default logged-in owner for quick access/testing!
   if (!localStorage.getItem(KEYS.OWNER)) {
     localStorage.setItem(KEYS.OWNER, JSON.stringify(seedOwners[0]));
@@ -277,11 +314,22 @@ const initDB = () => {
 // Execute DB initialization
 initDB();
 
+let onMutationCallback: ((type: string, shopId: string, payload: any, description: string) => void) | null = null;
+
 export const dbMock = {
+  setMutationHook: (cb: typeof onMutationCallback) => {
+    onMutationCallback = cb;
+  },
   // Authentication & Session Simulation
   getLoggedInOwner: (): Owner | null => {
     const raw = localStorage.getItem(KEYS.OWNER);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Owner;
+    if (!parsed.role) {
+      parsed.role = 'shop_owner';
+      localStorage.setItem(KEYS.OWNER, JSON.stringify(parsed));
+    }
+    return parsed;
   },
 
   setLoggedInOwner: (owner: Owner | null) => {
@@ -293,21 +341,66 @@ export const dbMock = {
     }
   },
 
-  signup: (email: string, name: string, phone: string): Owner => {
-    const newOwner: Owner = { id: uuid(), email, name, phone };
+  signup: (
+    email: string,
+    name: string,
+    phone: string,
+    shopName: string,
+    businessCategory: string,
+    city: string,
+    area: string
+  ): Owner => {
+    const ownerId = uuid();
+    const newOwner: Owner = { id: ownerId, email, name, phone, role: 'shop_owner' };
     dbMock.setLoggedInOwner(newOwner);
 
-    // Create a default shop for this new owner so they don't see blank selection
+    // 1. Create/Update Profiles simulation
+    const profilesRaw = localStorage.getItem('nexora_profiles') || '[]';
+    const profiles = JSON.parse(profilesRaw);
+    profiles.push({
+      id: ownerId,
+      email,
+      name,
+      phone,
+      city,
+      area,
+      created_at: new Date().toISOString()
+    });
+    localStorage.setItem('nexora_profiles', JSON.stringify(profiles));
+
+    // 2. Create/Update User Roles simulation
+    const userRolesRaw = localStorage.getItem('nexora_user_roles') || '[]';
+    const userRoles = JSON.parse(userRolesRaw);
+    userRoles.push({
+      user_id: ownerId,
+      role: 'shop_owner'
+    });
+    localStorage.setItem('nexora_user_roles', JSON.stringify(userRoles));
+
+    // 3. Create/Update Salon Owners simulation
+    const salonOwnersRaw = localStorage.getItem('nexora_salon_owners') || '[]';
+    const salonOwners = JSON.parse(salonOwnersRaw);
+    salonOwners.push({
+      id: ownerId,
+      name,
+      phone,
+      email,
+      city,
+      area
+    });
+    localStorage.setItem('nexora_salon_owners', JSON.stringify(salonOwners));
+
+    // 4. Create/Update Shops/Salons
     const defaultShop: Shop = {
       id: `shop-${uuid()}`,
-      owner_id: newOwner.id,
-      name: `${name}'s Premium Salon`,
-      type: 'Salon & Grooming',
-      address: 'Near Main Market, Town Plaza, New Delhi',
+      owner_id: ownerId,
+      name: shopName,
+      type: businessCategory || 'Salon & Grooming',
+      address: `${area}, ${city}`,
       phone: phone,
       rating: 5.0,
-      qr_code_url: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=nexora${newOwner.id}@okaxis%26pn=${encodeURIComponent(name)}%26am=0%26cu=INR`,
-      upi_id: `nexora${newOwner.id}@okaxis`
+      qr_code_url: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=nexora${ownerId}@okaxis%26pn=${encodeURIComponent(name)}%26am=0%26cu=INR`,
+      upi_id: `nexora${ownerId}@okaxis`
     };
 
     const currentShops = dbMock.getShopsRaw();
@@ -351,6 +444,7 @@ export const dbMock = {
   getBlockedSlotsRaw: (): BlockedSlot[] => JSON.parse(localStorage.getItem(KEYS.BLOCKED_SLOTS) || '[]'),
   getTransactionsRaw: (): WalletTransaction[] => JSON.parse(localStorage.getItem(KEYS.TRANSACTIONS) || '[]'),
   getNotificationsRaw: (): AppNotification[] => JSON.parse(localStorage.getItem(KEYS.NOTIFICATIONS) || '[]'),
+  getWalletsRaw: (): any[] => JSON.parse(localStorage.getItem(KEYS.WALLETS) || '[]'),
 
   // RLS Filtered Queries (Always scoped by shop_id or owner_id)
   getShopsForOwner: (ownerId: string): Shop[] => {
@@ -383,6 +477,10 @@ export const dbMock = {
 
   getNotifications: (shopId: string): AppNotification[] => {
     return dbMock.getNotificationsRaw().filter(notif => notif.shop_id === shopId);
+  },
+
+  getReviews: (shopId: string): Review[] => {
+    return JSON.parse(localStorage.getItem(KEYS.REVIEWS) || '[]').filter((r: Review) => r.shop_id === shopId);
   },
 
   // Mutations
@@ -425,6 +523,9 @@ export const dbMock = {
     }
 
     localStorage.setItem(KEYS.SERVICES, JSON.stringify(current));
+    if (onMutationCallback) {
+      onMutationCallback('save_service', shopId, updated, `Save Service: ${updated.name}`);
+    }
     return updated;
   },
 
@@ -460,6 +561,9 @@ export const dbMock = {
     }
 
     localStorage.setItem(KEYS.STAFF, JSON.stringify(current));
+    if (onMutationCallback) {
+      onMutationCallback('save_staff', shopId, updated, `Save Staff: ${updated.name}`);
+    }
     return updated;
   },
 
@@ -470,15 +574,39 @@ export const dbMock = {
   },
 
   // Block slots mutations
-  addBlockedSlot: (shopId: string, slot: Omit<BlockedSlot, 'id' | 'shop_id'>): BlockedSlot => {
+  addBlockedSlot: (shopId: string, slot: Omit<BlockedSlot, 'id' | 'shop_id' | 'created_at' | 'created_by' | 'is_active'>): BlockedSlot => {
     const id = `blk-${uuid()}`;
-    const newSlot: BlockedSlot = { ...slot, id, shop_id: shopId };
+    const loggedOwner = dbMock.getLoggedInOwner();
+    const newSlot: BlockedSlot = { 
+      ...slot, 
+      id, 
+      shop_id: shopId,
+      is_active: true,
+      created_by: loggedOwner?.id || 'system',
+      created_at: new Date().toISOString()
+    };
     const current = dbMock.getBlockedSlotsRaw();
     current.push(newSlot);
     localStorage.setItem(KEYS.BLOCKED_SLOTS, JSON.stringify(current));
+    if (onMutationCallback) {
+      onMutationCallback('add_blocked_slot', shopId, newSlot, `Block Slot: ${newSlot.reason || 'Lunch Break'}`);
+    }
     return newSlot;
   },
 
+
+  saveBlockedSlot: (shopId: string, slot: Partial<BlockedSlot> & { id?: string }): BlockedSlot => {
+    if (slot.id) {
+      const current = dbMock.getBlockedSlotsRaw();
+      const existing = current.find(s => s.id === slot.id && s.shop_id === shopId);
+      if (!existing) throw new Error('Blocked slot not found');
+      Object.assign(existing, slot);
+      localStorage.setItem(KEYS.BLOCKED_SLOTS, JSON.stringify(current));
+      return existing;
+    } else {
+      return dbMock.addBlockedSlot(shopId, slot as Omit<BlockedSlot, 'id' | 'shop_id'>);
+    }
+  },
   deleteBlockedSlot: (shopId: string, slotId: string) => {
     const current = dbMock.getBlockedSlotsRaw();
     const filtered = current.filter(s => !(s.id === slotId && s.shop_id === shopId));
@@ -532,11 +660,43 @@ export const dbMock = {
       dbMock.addNotification(shopId, {
         title: 'New Manual Booking',
         message: `${updated.customer_name} booked ${updated.service_name} with ${updated.staff_name} at ${updated.time_slot}`,
-        type: 'booking_new'
+        type: 'new_booking'
       });
     }
 
     localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(currentBookings));
+    if (onMutationCallback) {
+      const isStatusUpdate = !!booking.id;
+      const type = isStatusUpdate ? 'update_booking_status' : 'save_booking';
+      const desc = isStatusUpdate 
+        ? `Update Booking: ${updated.customer_name} -> ${updated.status}`
+        : `New Booking: ${updated.customer_name} (${updated.service_name})`;
+      onMutationCallback(type, shopId, updated, desc);
+    }
+    return updated;
+  },
+
+  saveCustomer: (shopId: string, customer: Customer): Customer => {
+    const current = dbMock.getCustomersRaw();
+    const existingIndex = current.findIndex(c => c.id === customer.id);
+    let updated: Customer;
+
+    if (existingIndex >= 0) {
+      updated = { ...current[existingIndex], ...customer };
+      current[existingIndex] = updated;
+    } else {
+      updated = {
+        ...customer,
+        id: customer.id || `cust-${uuid()}`,
+        shop_id: shopId
+      };
+      current.push(updated);
+    }
+
+    localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(current));
+    if (onMutationCallback) {
+      onMutationCallback('save_customer', shopId, updated, `Update Customer: ${updated.name}`);
+    }
     return updated;
   },
 
@@ -569,20 +729,40 @@ export const dbMock = {
     const alreadyExists = txs.some(t => t.booking_id === booking.id);
     if (alreadyExists) return;
 
+    // Commission logic: Nexora takes 10% on UPI payments
+    const commission = booking.payment_method === 'upi' ? Math.round(booking.price * 0.1) : 0;
+    const ownerAmount = booking.price - commission;
+
     // Create a wallet credit transaction
     const newTx: WalletTransaction = {
       id: `tx-${uuid()}`,
       shop_id: shopId,
       amount: booking.price,
+      commission,
+      owner_amount: ownerAmount,
       type: 'credit',
       method: booking.payment_method || 'cash',
       status: 'success',
       booking_id: booking.id,
+      customer_name: booking.customer_name,
       description: `${booking.service_name} - ${booking.customer_name}`,
       created_at: new Date().toISOString()
     };
     txs.push(newTx);
     localStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(txs));
+
+    // Update wallet
+    if (booking.payment_method === 'upi') {
+      const wallets = dbMock.getWalletsRaw();
+      let wallet = wallets.find(w => w.shop_id === shopId);
+      if (!wallet) {
+        wallet = { shop_id: shopId, total_earned: 0, pending_settlement: 0, last_payout_amount: 0, last_payout_date: '' };
+        wallets.push(wallet);
+      }
+      wallet.total_earned += booking.price;
+      wallet.pending_settlement += ownerAmount;
+      localStorage.setItem(KEYS.WALLETS, JSON.stringify(wallets));
+    }
 
     // Update customer's spend details
     if (booking.customer_phone) {
@@ -617,7 +797,16 @@ export const dbMock = {
     return newNotif;
   },
 
-  markNotificationsRead: (shopId: string) => {
+  markNotificationRead: (shopId: string, id: string) => {
+    const current = dbMock.getNotificationsRaw();
+    const target = current.find(n => n.id === id && n.shop_id === shopId);
+    if (target) {
+      target.is_read = true;
+      localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(current));
+    }
+  },
+
+  markAllNotificationsRead: (shopId: string) => {
     const current = dbMock.getNotificationsRaw();
     current.forEach(n => {
       if (n.shop_id === shopId) {
@@ -627,18 +816,25 @@ export const dbMock = {
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(current));
   },
 
-  markSingleNotificationRead: (shopId: string, id: string) => {
-    const current = dbMock.getNotificationsRaw();
-    const target = current.find(n => n.id === id && n.shop_id === shopId);
-    if (target) {
-      target.is_read = true;
-      localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(current));
-    }
-  },
-
   deleteNotification: (shopId: string, id: string) => {
     const current = dbMock.getNotificationsRaw();
     const filtered = current.filter(n => !(n.id === id && n.shop_id === shopId));
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(filtered));
+  },
+
+  getWallet: (shopId: string) => {
+    const wallets = dbMock.getWalletsRaw();
+    return wallets.find(w => w.shop_id === shopId) || { shop_id: shopId, total_earned: 0, pending_settlement: 0, last_payout_amount: 0, last_payout_date: '' };
+  },
+
+  saveShop: (shopId: string, data: Partial<Shop>) => {
+    const shops = dbMock.getShopsRaw();
+    const shopIdx = shops.findIndex(s => s.id === shopId);
+    if (shopIdx > -1) {
+      shops[shopIdx] = { ...shops[shopIdx], ...data };
+      localStorage.setItem(KEYS.SHOPS, JSON.stringify(shops));
+      return shops[shopIdx];
+    }
+    throw new Error('Shop not found');
   }
 };

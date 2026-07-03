@@ -35,6 +35,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
   const [durationMins, setDurationMins] = useState(30);
   const [price, setPrice] = useState(250);
   const [category, setCategory] = useState('Hair');
+  const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState('');
 
@@ -55,6 +56,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
       setDurationMins(selectedServiceData.duration_mins);
       setPrice(selectedServiceData.price);
       setCategory(selectedServiceData.category);
+      setDescription(selectedServiceData.description || '');
       setIsActive(selectedServiceData.is_active);
     } else if (screenMode === 'add_edit') {
       // Clear form
@@ -62,6 +64,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
       setDurationMins(30);
       setPrice(200);
       setCategory('Hair');
+      setDescription('');
       setIsActive(true);
     }
   };
@@ -85,6 +88,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
         duration_mins: durationMins,
         price,
         category,
+        description: description.trim(),
         is_active: isActive
       });
 
@@ -120,7 +124,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
   };
 
   return (
-    <div className="flex flex-col min-h-[580px] bg-slate-50 pb-20 relative overflow-y-auto">
+    <div className="flex flex-col min-h-[580px] bg-[#F8FAFC] pb-20 relative overflow-y-auto">
       {/* Toast Notification */}
       {toast.show && (
         <div className="absolute top-4 left-4 right-4 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 border border-slate-800 animate-slide-in">
@@ -134,12 +138,12 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
         <div className="p-4 space-y-4">
           <div className="flex justify-between items-center mt-2">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Services Catalog (सेवा सूची)</h2>
-              <p className="text-xs text-slate-500">Configure prices and times of your services</p>
+              <h2 className="text-xl font-bold text-[#0F172A]">Services Catalog (सेवा सूची)</h2>
+              <p className="text-xs text-[#64748B]">Configure prices and times of your services</p>
             </div>
             <button
               onClick={() => onNavigateTo('service_add_edit')}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1 shadow-sm transition-colors"
+              className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1 shadow-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Service
@@ -148,28 +152,28 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
 
           <div className="space-y-3">
             {services.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center flex flex-col items-center">
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center flex flex-col items-center">
                 <Briefcase className="w-10 h-10 text-slate-300 mb-2" />
                 <p className="text-sm font-medium text-slate-600">No services cataloged</p>
-                <p className="text-xs text-slate-400 mt-0.5">Add basic services to start receiving client selections.</p>
+                <p className="text-xs text-[#64748B] mt-0.5">Add basic services to start receiving client selections.</p>
               </div>
             ) : (
               services.map(srv => (
                 <div
                   key={srv.id}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex justify-between items-center hover:shadow-sm transition-shadow"
+                  className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-xs flex justify-between items-center hover:shadow-sm transition-shadow"
                 >
                   <div className="flex items-start gap-3">
                     <div className="p-2.5 bg-slate-100 rounded-xl text-slate-600 flex-shrink-0">
                       <Briefcase className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="inline-block text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded uppercase mb-1">
+                      <span className="inline-block text-[9px] font-bold bg-blue-50 text-[#2563EB] px-1.5 py-0.2 rounded uppercase mb-1">
                         {srv.category}
                       </span>
-                      <h4 className="text-xs font-bold text-slate-900">{srv.name}</h4>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1">
-                        <span className="font-extrabold text-slate-800">₹{srv.price}</span>
+                      <h4 className="text-xs font-bold text-[#0F172A]">{srv.name}</h4>
+                      <div className="flex items-center gap-2 text-[10px] text-[#64748B] mt-1">
+                        <span className="font-extrabold text-[#0F172A]">₹{srv.price}</span>
                         <span>•</span>
                         <span className="flex items-center gap-0.5">
                           <Clock className="w-3 h-3 text-slate-400" />
@@ -183,10 +187,10 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
                     {/* Toggle activation */}
                     <button
                       onClick={() => handleToggleActive(srv)}
-                      className="p-1 rounded text-slate-400 hover:text-slate-600 transition-colors"
+                      className="p-1 rounded text-slate-400 hover:text-[#64748B] transition-colors"
                     >
                       {srv.is_active ? (
-                        <ToggleRight className="w-7 h-7 text-blue-600" />
+                        <ToggleRight className="w-7 h-7 text-[#2563EB]" />
                       ) : (
                         <ToggleLeft className="w-7 h-7 text-slate-300" />
                       )}
@@ -218,19 +222,19 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={() => onNavigateTo('profile')}
-              className="p-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+              className="p-1.5 bg-white border border-[#E2E8F0] rounded-xl hover:bg-slate-50"
             >
-              <ChevronLeft className="w-5 h-5 text-slate-600" />
+              <ChevronLeft className="w-5 h-5 text-[#64748B]" />
             </button>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-lg font-bold text-[#0F172A]">
                 {selectedServiceData ? 'Edit Service' : 'Add New Service (नया सर्विस जोड़ें)'}
               </h2>
-              <p className="text-xs text-slate-500">Configure prices, categories, and times</p>
+              <p className="text-xs text-[#64748B]">Configure prices, categories, and times</p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm">
             {error && (
               <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg border border-red-100 mb-4 font-semibold">
                 {error}
@@ -239,7 +243,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                   Service Name (सर्विस का नाम) *
                 </label>
                 <input
@@ -247,13 +251,13 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Classic Haircut & Styling"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                     Price (कीमत ₹) *
                   </label>
                   <input
@@ -261,18 +265,18 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
                     value={price}
                     onChange={e => setPrice(Number(e.target.value))}
                     placeholder="250"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                     Duration (मिनटों में) *
                   </label>
                   <select
                     value={durationMins}
                     onChange={e => setDurationMins(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                   >
                     <option value={15}>15 mins</option>
                     <option value={20}>20 mins</option>
@@ -286,13 +290,13 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                   Category (श्रेणी) *
                 </label>
                 <select
                   value={category}
                   onChange={e => setCategory(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                 >
                   <option value="Hair">Hair Grooming</option>
                   <option value="Beard">Beard Grooming</option>
@@ -303,22 +307,35 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
                 </select>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <div>
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Optional details about this service"
+                  rows={2}
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 bg-[#F8FAFC] p-3 rounded-xl border border-[#E2E8F0]">
                 <input
                   type="checkbox"
                   id="srv-is-active"
                   checked={isActive}
                   onChange={e => setIsActive(e.target.checked)}
-                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                  className="rounded text-[#2563EB] focus:ring-[#2563EB] w-4 h-4"
                 />
-                <label htmlFor="srv-is-active" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                <label htmlFor="srv-is-active" className="text-xs font-semibold text-[#64748B] cursor-pointer select-none">
                   Make service active and available for booking
                 </label>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-3.5 rounded-xl shadow transition-colors"
+                className="w-full bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold py-3.5 rounded-xl shadow transition-colors"
               >
                 Save Service Details (सुरक्षित करें)
               </button>

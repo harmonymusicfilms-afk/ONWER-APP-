@@ -69,7 +69,7 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
   };
 
   return (
-    <div className="flex flex-col min-h-[580px] bg-slate-50 p-5 relative overflow-y-auto">
+    <div className="flex flex-col min-h-[580px] bg-[#F8FAFC] p-5 relative overflow-y-auto">
       {/* Toast Notification */}
       {toast.show && (
         <div className="absolute top-4 left-4 right-4 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 border border-slate-800 animate-slide-in">
@@ -80,10 +80,10 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
 
       {/* Header */}
       <div className="mb-6 mt-2">
-        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-[#0F172A] flex items-center gap-2">
           Hello, {owner.name} 👋
         </h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-[#64748B] mt-1">
           Select a shop to manage your daily operations.
         </p>
       </div>
@@ -92,12 +92,12 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
       {!isAdding ? (
         <div className="space-y-4 flex-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
               Your Outlets ({shops.length})
             </span>
             <button
               onClick={() => setIsAdding(true)}
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 py-1.5 px-3 rounded-lg"
+              className="text-xs font-bold text-[#2563EB] hover:text-blue-700 flex items-center gap-1 bg-blue-50 py-1.5 px-3 rounded-lg transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Shop (नया आउटलेट)
@@ -105,66 +105,84 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
           </div>
 
           {shops.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center flex flex-col items-center">
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+            <div className="bg-white rounded-2xl border border-dashed border-[#E2E8F0] p-8 text-center flex flex-col items-center">
+              <div className="w-12 h-12 bg-[#F8FAFC] rounded-full flex items-center justify-center mb-3 border border-[#E2E8F0]">
                 <Store className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm font-medium text-slate-600">No outlets registered yet</p>
-              <p className="text-xs text-slate-400 mt-1 mb-4">Add your first business outlet to start taking bookings.</p>
+              <p className="text-sm font-medium text-[#0F172A]">No outlets registered yet</p>
+              <p className="text-xs text-[#64748B] mt-1 mb-4">Add your first business outlet to start taking bookings.</p>
               <button
                 onClick={() => setIsAdding(true)}
-                className="bg-blue-600 text-white text-xs font-semibold py-2 px-4 rounded-xl shadow"
+                className="bg-[#2563EB] text-white text-xs font-semibold py-2 px-4 rounded-xl shadow transition-colors"
               >
                 Add Your First Shop
               </button>
             </div>
           ) : (
             <div className="space-y-3.5">
-              {shops.map(shop => (
-                <motion.div
-                  key={shop.id}
-                  whileHover={{ y: -1 }}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <span className="inline-block text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full uppercase tracking-wider mb-2">
-                        {shop.type}
-                      </span>
-                      <div className="flex items-center gap-1 text-amber-500 text-xs font-semibold">
-                        <Star className="w-3.5 h-3.5 fill-current" />
-                        {shop.rating.toFixed(1)}
-                      </div>
-                    </div>
+              {shops.map(shop => {
+                const addressParts = shop.address.split(',');
+                const areaName = addressParts[0]?.trim() || shop.address;
 
-                    <h3 className="text-base font-bold text-slate-900">{shop.name}</h3>
-
-                    <div className="mt-3.5 space-y-1.5">
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                        <span className="truncate">{shop.address}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Phone className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-                        <span>{shop.phone}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => onSelectShop(shop.id)}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors mt-4"
+                return (
+                  <motion.div
+                    key={shop.id}
+                    whileHover={{ y: -1 }}
+                    className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-sm flex flex-col justify-between"
                   >
-                    Manage Shop (प्रबंधित करें)
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </motion.div>
-              ))}
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <span className="inline-block text-[10px] font-bold bg-blue-50 text-[#2563EB] px-2 py-0.5 rounded-full uppercase tracking-wider mb-2">
+                          {shop.type}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Active
+                          </span>
+                          <div className="flex items-center gap-1 text-amber-500 text-xs font-semibold">
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            {shop.rating.toFixed(1)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <h3 className="text-base font-bold text-[#0F172A]">{shop.name}</h3>
+
+                      <div className="mt-3.5 space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                          <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                          <span className="font-semibold text-slate-700">Area:</span>
+                          <span className="truncate">{areaName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                          <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                          <span className="font-semibold text-slate-700">Address:</span>
+                          <span className="truncate">{shop.address}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                          <Phone className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                          <span className="font-semibold text-slate-700">Phone:</span>
+                          <span>{shop.phone}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onSelectShop(shop.id)}
+                      className="w-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors mt-4 shadow-sm uppercase tracking-wider"
+                    >
+                      Open Shop
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 relative">
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 relative shadow-sm">
           <button
             onClick={() => setIsAdding(false)}
             className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-50 p-1 rounded-full"
@@ -172,11 +190,11 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
             <X className="w-4 h-4" />
           </button>
 
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-blue-600" />
+          <h3 className="text-base font-bold text-[#0F172A] flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#2563EB]" />
             Add New Shop (नया आउटलेट)
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5 mb-4">
+          <p className="text-xs text-[#64748B] mt-0.5 mb-4">
             Register another branch or setup a new wellness business.
           </p>
 
@@ -188,7 +206,7 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
 
           <form onSubmit={handleAddShop} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                 Shop Name (दुकान का नाम) *
               </label>
               <input
@@ -196,18 +214,18 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Looks Hair Spa Noida"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                 Business Type (श्रेणी) *
               </label>
               <select
                 value={type}
                 onChange={e => setType(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
               >
                 <option value="Salon & Grooming">Salon & Grooming (सैलून)</option>
                 <option value="Spa & Wellness">Spa & Wellness (स्पा)</option>
@@ -217,7 +235,7 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                 Address (पता) *
               </label>
               <input
@@ -225,12 +243,12 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
                 value={address}
                 onChange={e => setAddress(e.target.value)}
                 placeholder="Full address of the outlet"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                 Contact Phone (फ़ोन नंबर) *
               </label>
               <input
@@ -238,12 +256,12 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 placeholder="+91 98XXX XXXXX"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                 UPI ID for QR Payments (यूपीआई आईडी) *
               </label>
               <input
@@ -251,7 +269,7 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
                 value={upi}
                 onChange={e => setUpi(e.target.value)}
                 placeholder="e.g. looksnoida@okaxis"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
               />
               <p className="text-[10px] text-slate-400 mt-1">
                 Customer scans will transfer funds directly to this business account.
@@ -268,7 +286,7 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-3 rounded-xl shadow-md transition-colors"
+                className="flex-1 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold py-3 rounded-xl shadow-md transition-colors"
               >
                 Save Outlet
               </button>

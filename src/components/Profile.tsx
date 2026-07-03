@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ShieldAlert,
   MessageSquare,
+  MessageCircle,
   FileQuestion,
   ChevronLeft,
   Mail,
@@ -28,7 +29,7 @@ import { Owner, Shop, BlockedSlot } from '../types';
 interface ProfileProps {
   owner: Owner;
   shop: Shop;
-  screenMode: 'menu' | 'help';
+  screenMode: 'menu' | 'help' | 'edit_shop';
   onNavigateTo: (screen: string) => void;
   onLogout: () => void;
   onSwitchShop: () => void;
@@ -39,9 +40,43 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSubmitted, setSupportSubmitted] = useState(false);
 
+  // Edit Shop States
+  const [editShopName, setEditShopName] = useState(shop.name);
+  const [editShopPhone, setEditShopPhone] = useState(shop.phone || '');
+  const [editShopAddress, setEditShopAddress] = useState(shop.address || '');
+  const [editShopCity, setEditShopCity] = useState(shop.city || '');
+  const [editShopArea, setEditShopArea] = useState(shop.area || '');
+  const [editShopOpen, setEditShopOpen] = useState(shop.opening_time || '09:00 AM');
+  const [editShopClose, setEditShopClose] = useState(shop.closing_time || '08:00 PM');
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     setBlockedSlots(dbMock.getBlockedSlots(shop.id));
   }, [shop.id]);
+
+  const handleUpdateShop = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      dbMock.saveShop(shop.id, {
+        name: editShopName,
+        phone: editShopPhone,
+        address: editShopAddress,
+        city: editShopCity,
+        area: editShopArea,
+        opening_time: editShopOpen,
+        closing_time: editShopClose
+      });
+      setTimeout(() => {
+        setIsSaving(false);
+        onNavigateTo('profile');
+        alert('Shop details updated successfully! (दुकान का विवरण अपडेट कर दिया गया है!)');
+      }, 800);
+    } catch (err) {
+      setIsSaving(false);
+      alert('Error updating shop details.');
+    }
+  };
 
   const handleSupportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,43 +98,79 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
   };
 
   return (
-    <div className="flex flex-col min-h-[580px] bg-slate-50 pb-20 relative overflow-y-auto">
+    <div className="flex flex-col min-h-[580px] bg-[#F8FAFC] pb-20 relative overflow-y-auto">
       {/* 1. PROFILE / SETTINGS MENU */}
       {screenMode === 'menu' && (
         <div className="p-4 space-y-4">
           {/* Owner details top card */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm flex items-center gap-3.5 mt-2">
-            <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-extrabold text-base">
+          <div className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-sm flex items-center gap-3.5 mt-2">
+            <div className="w-12 h-12 bg-[#0F172A] text-white rounded-2xl flex items-center justify-center font-extrabold text-base">
               {owner.name.charAt(0)}
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-900">{owner.name}</h3>
-              <p className="text-xs text-slate-500 font-semibold">{owner.email}</p>
+              <h3 className="text-base font-black text-[#0F172A]">{owner.name}</h3>
+              <p className="text-xs text-[#64748B] font-semibold">{owner.email}</p>
               <p className="text-[10px] text-slate-400 mt-0.5">{owner.phone}</p>
             </div>
           </div>
 
           {/* Connected Outlet Box */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                <Store className="w-5 h-5" />
+          <div className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-sm space-y-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 text-[#2563EB] rounded-xl">
+                  <Store className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">Active Managed Shop</span>
+                  <span className="text-xs font-bold text-[#0F172A]">{shop.name}</span>
+                </div>
+              </div>
+              <button
+                onClick={onSwitchShop}
+                className="text-[10px] font-bold text-[#2563EB] hover:text-blue-700 bg-blue-50 py-1.5 px-3 rounded-lg transition-colors uppercase tracking-wider"
+              >
+                Switch
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
+              <div>
+                <span className="text-[8px] font-bold text-slate-400 uppercase">Category</span>
+                <p className="text-[10px] font-bold text-[#0F172A]">{shop.category || 'Salon & Spa'}</p>
               </div>
               <div>
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">Active Managed Shop</span>
-                <span className="text-xs font-bold text-slate-800">{shop.name}</span>
+                <span className="text-[8px] font-bold text-slate-400 uppercase">Location</span>
+                <p className="text-[10px] font-bold text-[#0F172A]">{shop.area}, {shop.city}</p>
+              </div>
+              <div className="col-span-2 flex items-center gap-2">
+                <span className="text-[8px] font-bold text-slate-400 uppercase">Status:</span>
+                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${shop.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                  {shop.is_active ? '● Open' : '○ Closed'}
+                </span>
               </div>
             </div>
-            <button
-              onClick={onSwitchShop}
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50/50 py-1.5 px-3 rounded-lg"
-            >
-              Switch Shop
-            </button>
           </div>
 
           {/* Navigation link blocks */}
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden divide-y divide-slate-100">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden divide-y divide-slate-100">
+            {/* Shop Basic Info */}
+            <div
+              onClick={() => onNavigateTo('edit_shop')}
+              className="p-4 flex justify-between items-center hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-600">
+                  <ShieldAlert className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Shop Basic Info (दुकान की जानकारी)</h4>
+                  <p className="text-[10px] text-slate-400">Update name, address, and timings</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </div>
+
             {/* Services Catalogs */}
             <div
               onClick={() => onNavigateTo('services')}
@@ -188,8 +259,8 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
 
           {/* Active Blocked Slots List block */}
           {blockedSlots.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <div className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-sm space-y-3">
+              <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-1">
                 <Ban className="w-3.5 h-3.5" />
                 Active Blocked Slots ({blockedSlots.length})
               </h4>
@@ -198,20 +269,20 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
                 {blockedSlots.map(slot => (
                   <div
                     key={slot.id}
-                    className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100"
+                    className="flex justify-between items-center bg-[#F8FAFC] p-2.5 rounded-xl border border-slate-100"
                   >
                     <div>
                       <span className="text-[10px] font-bold text-red-600 uppercase bg-red-50 px-1.5 py-0.2 rounded">
                         Blocked
                       </span>
                       <h5 className="text-xs font-bold text-slate-800 mt-1">{slot.reason}</h5>
-                      <p className="text-[9px] text-slate-500">
+                      <p className="text-[9px] text-[#64748B]">
                         {slot.staff_name} • {slot.date} • {slot.start_time}-{slot.end_time}
                       </p>
                     </div>
                     <button
                       onClick={() => handleRemoveBlockedSlot(slot.id)}
-                      className="text-[9px] font-bold text-red-600 bg-red-50 hover:bg-red-100 py-1 px-2 rounded-lg"
+                      className="text-[9px] font-bold text-red-600 bg-red-50 hover:bg-red-100 py-1 px-2 rounded-lg transition-colors"
                     >
                       Unlock Slot
                     </button>
@@ -224,11 +295,119 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
           {/* Log out section */}
           <button
             onClick={onLogout}
-            className="w-full bg-slate-100 hover:bg-slate-200/80 text-red-600 text-xs font-bold py-3.5 rounded-2xl flex items-center justify-center gap-1.5 transition-colors mt-2"
+            className="w-full bg-[#1E293B] hover:bg-slate-800 text-white text-xs font-bold py-3.5 rounded-2xl flex items-center justify-center gap-1.5 transition-colors mt-2 shadow-sm"
           >
             <LogOut className="w-4 h-4" />
             Logout from Nexora Owner (लॉग आउट करें)
           </button>
+        </div>
+      )}
+
+      {/* 3. EDIT SHOP INFO SCREEN */}
+      {screenMode === 'edit_shop' && (
+        <div className="p-4 space-y-4">
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={() => onNavigateTo('profile')}
+              className="p-1.5 bg-white border border-[#E2E8F0] rounded-xl hover:bg-slate-50"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <div>
+              <h2 className="text-lg font-bold text-[#0F172A]">Edit Shop Info</h2>
+              <p className="text-xs text-[#64748B]">Update your business profile details</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-5 border border-[#E2E8F0] shadow-sm overflow-hidden">
+            <form onSubmit={handleUpdateShop} className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Shop Name *</label>
+                  <input
+                    type="text"
+                    value={editShopName}
+                    onChange={e => setEditShopName(e.target.value)}
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Contact Number *</label>
+                  <input
+                    type="tel"
+                    value={editShopPhone}
+                    onChange={e => setEditShopPhone(e.target.value)}
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Full Address *</label>
+                  <textarea
+                    value={editShopAddress}
+                    onChange={e => setEditShopAddress(e.target.value)}
+                    rows={2}
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">City *</label>
+                    <input
+                      type="text"
+                      value={editShopCity}
+                      onChange={e => setEditShopCity(e.target.value)}
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Area *</label>
+                    <input
+                      type="text"
+                      value={editShopArea}
+                      onChange={e => setEditShopArea(e.target.value)}
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Opening Time</label>
+                    <input
+                      type="text"
+                      value={editShopOpen}
+                      onChange={e => setEditShopOpen(e.target.value)}
+                      placeholder="e.g. 09:00 AM"
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Closing Time</label>
+                    <input
+                      type="text"
+                      value={editShopClose}
+                      onChange={e => setEditShopClose(e.target.value)}
+                      placeholder="e.g. 08:00 PM"
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="w-full bg-[#2563EB] hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-sm font-black py-4 rounded-2xl shadow-md transition-all active:scale-[0.98]"
+                >
+                  {isSaving ? 'Updating Profile...' : 'Save Profile Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -238,84 +417,82 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={() => onNavigateTo('profile')}
-              className="p-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+              className="p-1.5 bg-white border border-[#E2E8F0] rounded-xl hover:bg-slate-50"
             >
               <ChevronLeft className="w-5 h-5 text-slate-600" />
             </button>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Partner Help Desk (सहायता केंद्र)</h2>
-              <p className="text-xs text-slate-500">Resolve app issues or raise ticket instantly</p>
+              <h2 className="text-lg font-bold text-[#0F172A]">Help & Support (सहायता)</h2>
+              <p className="text-xs text-[#64748B]">Get quick help and frequently asked questions</p>
             </div>
           </div>
 
-          {/* FAQ Accordion list simulation */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3.5">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+          {/* Support Actions */}
+          <div className="grid grid-cols-2 gap-3">
+            <a 
+              href={`https://wa.me/919876543210?text=Hi%20Nexora%20Support,%20I%20need%20help%20with%20my%20shop%20dashboard.`}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-xs flex flex-col items-center justify-center gap-2 hover:bg-green-50 transition-colors"
+            >
+              <div className="w-10 h-10 bg-green-50 text-green-600 rounded-full flex items-center justify-center">
+                <MessageCircle className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-700">WhatsApp Support</span>
+            </a>
+            <a 
+              href="tel:+911800639672"
+              className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-xs flex flex-col items-center justify-center gap-2 hover:bg-blue-50 transition-colors"
+            >
+              <div className="w-10 h-10 bg-blue-50 text-[#2563EB] rounded-full flex items-center justify-center">
+                <Smartphone className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-700">Call Support</span>
+            </a>
+          </div>
+
+          {/* FAQ Accordion list */}
+          <div className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-sm space-y-3.5">
+            <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-1">
               <FileQuestion className="w-4 h-4 text-slate-400" />
-              Frequently Asked Questions (FAQS)
+              FAQ (सामान्य प्रश्न)
             </h3>
 
-            <div className="space-y-3 divide-y divide-slate-100 text-xs">
+            <div className="space-y-3 divide-y divide-slate-100 text-xs text-left">
               <div className="pt-2">
-                <h4 className="font-bold text-slate-800">Q: How do I complete a booking?</h4>
-                <p className="text-slate-600 mt-1">
-                  A: Ask the client for the 4-digit code shown on their booking card. Tap the "Complete" button on your agenda, enter the code, and settle the payment.
+                <h4 className="font-bold text-[#0F172A]">How to confirm booking?</h4>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  Go to the Bookings tab, find the pending request, and tap on "Confirm". The customer will receive an SMS confirmation.
                 </p>
               </div>
 
               <div className="pt-3">
-                <h4 className="font-bold text-slate-800">Q: When do I get payout in my bank account?</h4>
-                <p className="text-slate-600 mt-1">
-                  A: Head to your Wallet screen, click on "Instant Bank Payout", select the payout amount, and click Settle. Funds will transfer immediately via IMPS.
+                <h4 className="font-bold text-[#0F172A]">How to complete booking?</h4>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  Open the booking details and tap "Mark Completed". Enter the 4-digit OTP provided by the customer to settle the transaction.
                 </p>
               </div>
 
               <div className="pt-3">
-                <h4 className="font-bold text-slate-800">Q: What is a blocked slot?</h4>
-                <p className="text-slate-600 mt-1">
-                  A: If a staff member is going on lunch or the shop is temporarily closed, block that slot from Profile &gt; Block Slots so clients can't book it.
+                <h4 className="font-bold text-[#0F172A]">How settlement works?</h4>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  Earnings are credited to your Nexora Wallet instantly after booking completion. You can withdraw them to your bank account via the Wallet screen.
                 </p>
               </div>
-            </div>
-          </div>
 
-          {/* Raise a Support ticket */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <MessageSquare className="w-4 h-4 text-slate-400" />
-              Submit Partner Ticket (टिकट दर्ज करें)
-            </h3>
-
-            <form onSubmit={handleSupportSubmit} className="space-y-3">
-              <div>
-                <textarea
-                  value={supportMessage}
-                  onChange={e => setSupportMessage(e.target.value)}
-                  placeholder="Describe your issue or feature suggestion... (e.g., payout issue, change bank details, staff rating correction)"
-                  rows={3}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                />
+              <div className="pt-3">
+                <h4 className="font-bold text-[#0F172A]">How QR payment works?</h4>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  Show your dynamic QR code from the Wallet screen. When a customer pays, it updates your payment status automatically.
+                </p>
               </div>
 
-              <button
-                type="submit"
-                disabled={!supportMessage.trim()}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-xs font-semibold py-2.5 rounded-xl shadow-xs transition-colors"
-              >
-                {supportSubmitted ? 'Submitting ticket...' : 'Submit Support Query'}
-              </button>
-            </form>
-
-            <div className="flex justify-around items-center pt-2 text-[10px] text-slate-400 font-bold border-t border-slate-100 uppercase">
-              <span className="flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5" />
-                Call Desk: +91 1800-Nexora
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <Mail className="w-3.5 h-3.5" />
-                desk@nexora.in
-              </span>
+              <div className="pt-3">
+                <h4 className="font-bold text-[#0F172A]">How to block slot?</h4>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  Use the "Block Slot" option in the Bookings menu to mark specific hours as unavailable for new customer appointments.
+                </p>
+              </div>
             </div>
           </div>
         </div>

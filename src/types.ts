@@ -8,6 +8,7 @@ export interface Owner {
   email: string;
   name: string;
   phone: string;
+  role?: string;
 }
 
 export interface Shop {
@@ -20,6 +21,12 @@ export interface Shop {
   rating: number;
   qr_code_url: string; // UPI QR code simulated URL
   upi_id: string;
+  category?: string;
+  city?: string;
+  area?: string;
+  opening_time?: string;
+  closing_time?: string;
+  is_active?: boolean;
 }
 
 export interface Service {
@@ -29,6 +36,7 @@ export interface Service {
   duration_mins: number;
   price: number;
   category: string;
+  description?: string;
   is_active: boolean;
 }
 
@@ -41,6 +49,9 @@ export interface Staff {
   rating: number;
   is_available: boolean;
   avatar: string;
+  available_days?: string[];
+  opening_time?: string;
+  closing_time?: string;
 }
 
 export interface Booking {
@@ -56,7 +67,7 @@ export interface Booking {
   staff_name: string;
   date: string; // YYYY-MM-DD
   time_slot: string; // HH:MM
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
   payment_status: 'unpaid' | 'paid_online' | 'paid_cash';
   payment_method?: 'upi' | 'cash' | 'card';
   otp_code: string; // OTP for completion
@@ -72,8 +83,10 @@ export interface Customer {
   email?: string;
   total_bookings: number;
   total_spent: number;
+  reward_points?: number;
   last_visit_date?: string;
   notes?: string;
+  tags?: string[];
 }
 
 export interface BlockedSlot {
@@ -85,18 +98,43 @@ export interface BlockedSlot {
   start_time: string; // HH:MM
   end_time: string; // HH:MM
   reason: string;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CustomerInsight {
+  id: string;
+  customer_id: string;
+  shop_id: string;
+  tier: 'Gold' | 'Silver' | 'Bronze';
+  total_visits: number;
+  lifetime_spend: number;
+  last_visited_at: string;
+  preferences: string[];
 }
 
 export interface WalletTransaction {
   id: string;
   shop_id: string;
   amount: number;
+  commission: number;
+  owner_amount: number;
   type: 'credit' | 'debit';
   method: 'upi' | 'cash' | 'card' | 'payout';
   status: 'success' | 'pending' | 'failed';
   booking_id?: string;
+  customer_name?: string;
   description: string;
   created_at: string;
+}
+
+export interface SalonWallet {
+  shop_id: string;
+  total_earned: number;
+  pending_settlement: number;
+  last_payout_amount: number;
+  last_payout_date: string;
 }
 
 export interface AppNotification {
@@ -104,8 +142,18 @@ export interface AppNotification {
   shop_id: string;
   title: string;
   message: string;
-  type: 'booking_new' | 'booking_cancelled' | 'payment_received' | 'system';
+  type: 'new_booking' | 'booking_cancelled' | 'payment_received' | 'settlement' | 'review' | 'system';
   is_read: boolean;
+  created_at: string;
+}
+
+export interface Review {
+  id: string;
+  shop_id: string;
+  customer_id: string;
+  customer_name: string;
+  rating: number;
+  comment: string;
   created_at: string;
 }
 
@@ -129,4 +177,5 @@ export type ScreenType =
   | 'notifications'
   | 'profile'
   | 'help'
+  | 'edit_shop'
   | 'unauthorized';

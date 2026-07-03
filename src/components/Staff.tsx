@@ -37,6 +37,9 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
   const [phone, setPhone] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
   const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&q=80');
+  const [availableDays, setAvailableDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  const [openingTime, setOpeningTime] = useState('09:00');
+  const [closingTime, setClosingTime] = useState('21:00');
   const [error, setError] = useState('');
 
   // Toast
@@ -57,12 +60,18 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
       setPhone(selectedStaffData.phone);
       setIsAvailable(selectedStaffData.is_available);
       setAvatar(selectedStaffData.avatar);
+      setAvailableDays(selectedStaffData.available_days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+      setOpeningTime(selectedStaffData.opening_time || '09:00');
+      setClosingTime(selectedStaffData.closing_time || '21:00');
     } else if (screenMode === 'add_edit') {
       setName('');
       setRole('Hair Stylist');
       setPhone('');
       setIsAvailable(true);
       setAvatar('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&q=80');
+      setAvailableDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+      setOpeningTime('09:00');
+      setClosingTime('21:00');
     }
   };
 
@@ -85,7 +94,10 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
         role: role.trim(),
         phone: phone.trim(),
         is_available: isAvailable,
-        avatar
+        avatar,
+        available_days: availableDays,
+        opening_time: openingTime,
+        closing_time: closingTime
       });
 
       triggerToast(selectedStaffData ? 'Staff details updated!' : 'Staff member registered successfully!');
@@ -120,7 +132,7 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
   };
 
   return (
-    <div className="flex flex-col min-h-[580px] bg-slate-50 pb-20 relative overflow-y-auto">
+    <div className="flex flex-col min-h-[580px] bg-[#F8FAFC] pb-20 relative overflow-y-auto">
       {/* Toast Notification */}
       {toast.show && (
         <div className="absolute top-4 left-4 right-4 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 border border-slate-800 animate-slide-in">
@@ -134,12 +146,12 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
         <div className="p-4 space-y-4">
           <div className="flex justify-between items-center mt-2">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Our Staff (कर्मचारी सूची)</h2>
-              <p className="text-xs text-slate-500">Manage stylists and check reviews</p>
+              <h2 className="text-xl font-bold text-[#0F172A]">Our Staff (कर्मचारी सूची)</h2>
+              <p className="text-xs text-[#64748B]">Manage stylists and check reviews</p>
             </div>
             <button
               onClick={() => onNavigateTo('staff_add_edit')}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1 shadow-sm transition-colors"
+              className="bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1 shadow-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Staff
@@ -148,65 +160,82 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
 
           <div className="space-y-3">
             {staff.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center flex flex-col items-center">
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center flex flex-col items-center">
                 <Users className="w-10 h-10 text-slate-300 mb-2" />
                 <p className="text-sm font-medium text-slate-600">No staff registered</p>
-                <p className="text-xs text-slate-400 mt-0.5">Add staff members to assign tasks during bookings.</p>
+                <p className="text-xs text-[#64748B] mt-0.5">Add staff members to assign tasks during bookings.</p>
               </div>
             ) : (
               staff.map(member => (
                 <div
                   key={member.id}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex justify-between items-center hover:shadow-sm transition-shadow"
+                  className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-xs flex flex-col gap-3 hover:shadow-sm transition-shadow"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <img
-                      src={member.avatar}
-                      alt={member.name}
-                      className="w-11 h-11 rounded-xl object-cover bg-slate-100 flex-shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900">{member.name}</h4>
-                      <p className="text-[10px] text-slate-500">{member.role}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-0.5">
-                          <Phone className="w-3 h-3" />
-                          {member.phone}
-                        </span>
-                        <span className="text-slate-200">•</span>
-                        <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5">
-                          <Star className="w-3 h-3 fill-current" />
-                          {member.rating.toFixed(1)}
-                        </span>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3.5">
+                      <img
+                        src={member.avatar}
+                        alt={member.name}
+                        className="w-11 h-11 rounded-xl object-cover bg-slate-100 flex-shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div>
+                        <h4 className="text-xs font-bold text-[#0F172A]">{member.name}</h4>
+                        <p className="text-[10px] text-[#64748B]">{member.role}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-0.5">
+                            <Phone className="w-3 h-3" />
+                            {member.phone}
+                          </span>
+                          <span className="text-slate-200">•</span>
+                          <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5">
+                            <Star className="w-3 h-3 fill-current" />
+                            {member.rating.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {member.available_days?.map(day => (
+                            <span key={day} className="text-[8px] font-bold bg-slate-100 text-slate-600 px-1 py-0.5 rounded-sm uppercase">
+                              {day}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {/* Toggle Availability */}
+                      <button
+                        onClick={() => handleToggleAvailable(member)}
+                        className="p-1 rounded text-slate-400 hover:text-[#64748B] transition-colors flex flex-col items-center"
+                      >
+                        {member.is_available ? (
+                          <ToggleRight className="w-6 h-6 text-[#2563EB]" />
+                        ) : (
+                          <ToggleLeft className="w-6 h-6 text-slate-300" />
+                        )}
+                        <span className="text-[8px] font-bold mt-0.5">{member.is_available ? 'Active' : 'Inactive'}</span>
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Toggle Availability */}
+                  <div className="flex gap-2 pt-2 border-t border-slate-100">
                     <button
-                      onClick={() => handleToggleAvailable(member)}
-                      className="p-1 rounded text-slate-400 hover:text-slate-600 transition-colors"
+                      onClick={() => onNavigateTo('block_slot', member)}
+                      className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold py-2 rounded-xl border border-amber-200 transition-colors flex items-center justify-center gap-1"
                     >
-                      {member.is_available ? (
-                        <ToggleRight className="w-7 h-7 text-blue-600" />
-                      ) : (
-                        <ToggleLeft className="w-7 h-7 text-slate-300" />
-                      )}
+                      Block Time
                     </button>
-
                     <button
                       onClick={() => onNavigateTo('staff_add_edit', member)}
-                      className="p-1.5 bg-slate-50 rounded-lg text-slate-500 hover:bg-slate-100"
+                      className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[10px] font-bold py-2 rounded-xl border border-slate-200 transition-colors flex items-center justify-center gap-1"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-3 h-3" /> Edit
                     </button>
                     <button
                       onClick={() => handleDelete(member.id)}
-                      className="p-1.5 bg-red-50 rounded-lg text-red-500 hover:bg-red-100"
+                      className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold py-2 rounded-xl border border-red-200 transition-colors flex items-center justify-center gap-1"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" /> Delete
                     </button>
                   </div>
                 </div>
@@ -222,19 +251,19 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={() => onNavigateTo('profile')}
-              className="p-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+              className="p-1.5 bg-white border border-[#E2E8F0] rounded-xl hover:bg-slate-50"
             >
-              <ChevronLeft className="w-5 h-5 text-slate-600" />
+              <ChevronLeft className="w-5 h-5 text-[#64748B]" />
             </button>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-lg font-bold text-[#0F172A]">
                 {selectedStaffData ? 'Edit Staff Member' : 'Register Staff (नया स्टाफ जोड़ें)'}
               </h2>
-              <p className="text-xs text-slate-500">Configure profile, phone, and available status</p>
+              <p className="text-xs text-[#64748B]">Configure profile, phone, and available status</p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm">
             {error && (
               <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg border border-red-100 mb-4 font-semibold">
                 {error}
@@ -243,7 +272,7 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                   Staff Full Name (कर्मचारी का नाम) *
                 </label>
                 <input
@@ -251,12 +280,12 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Ramesh Kumar"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                   Staff Specialization / Role *
                 </label>
                 <input
@@ -264,12 +293,12 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
                   value={role}
                   onChange={e => setRole(e.target.value)}
                   placeholder="e.g. Senior Hair Stylist, Beard Expert"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                   Mobile Number (मोबाइल नंबर) *
                 </label>
                 <input
@@ -277,13 +306,13 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="+91 99111 XXXXX"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                 />
               </div>
 
               {/* Avatar Selector Gallery */}
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">
                   Choose Profile Avatar
                 </label>
                 <div className="flex gap-3">
@@ -298,7 +327,7 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
                       type="button"
                       onClick={() => setAvatar(url)}
                       className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 transition-all ${
-                        avatar === url ? 'border-blue-600 scale-105' : 'border-transparent opacity-70'
+                        avatar === url ? 'border-[#2563EB] scale-105' : 'border-transparent opacity-70'
                       }`}
                     >
                       <img src={url} alt="preset avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -307,22 +336,22 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <div className="flex items-center gap-3 bg-[#F8FAFC] p-3 rounded-xl border border-[#E2E8F0]">
                 <input
                   type="checkbox"
                   id="staff-is-available"
                   checked={isAvailable}
                   onChange={e => setIsAvailable(e.target.checked)}
-                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                  className="rounded text-[#2563EB] focus:ring-[#2563EB] w-4 h-4"
                 />
-                <label htmlFor="staff-is-available" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                <label htmlFor="staff-is-available" className="text-xs font-semibold text-[#64748B] cursor-pointer select-none">
                   Currently active & available for bookings today
                 </label>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-3.5 rounded-xl shadow transition-colors"
+                className="w-full bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold py-3.5 rounded-xl shadow transition-colors"
               >
                 Save Staff Member Details (सुरक्षित करें)
               </button>
