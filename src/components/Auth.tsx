@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Store, ShieldAlert, KeyRound, Mail, User, Phone, LogIn, UserPlus, Building2, MapPin } from 'lucide-react';
+import { SHOP_CATEGORIES } from '../constants/categories';
 import { dbMock } from '../lib/dbMock';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Owner } from '../types';
@@ -24,7 +25,7 @@ export default function Auth({ mode, onAuthSuccess, onSwitchMode, onClearSession
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [shopName, setShopName] = useState('');
-  const [businessCategory, setBusinessCategory] = useState('Salon & Grooming');
+  const [businessCategory, setBusinessCategory] = useState(SHOP_CATEGORIES[2].value);
   const [city, setCity] = useState('');
   const [area, setArea] = useState('');
   const [error, setError] = useState('');
@@ -151,8 +152,18 @@ export default function Auth({ mode, onAuthSuccess, onSwitchMode, onClearSession
         <h2 className="text-xl font-bold text-[#0F172A] mb-2 text-center">
           Unauthorized Access
         </h2>
-        <p className="text-sm text-[#64748B] text-center max-w-xs mb-8">
-          You are not allowed to access this shop.
+        <p className="text-xs text-[#64748B] text-center max-w-xs mb-4">
+          You are not allowed to access this shop or your profile could not be found.
+        </p>
+        {!isSupabaseConfigured() && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 max-w-xs">
+            <p className="text-[10px] text-amber-800 text-left leading-relaxed">
+              <strong>Supabase Not Configured:</strong> Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your settings.
+            </p>
+          </div>
+        )}
+        <p className="text-[10px] text-slate-400 mb-8 text-center max-w-xs leading-relaxed">
+          If you have configured Supabase, ensure you have run the database schema SQL in your Supabase SQL Editor.
         </p>
         <button
           onClick={() => {
@@ -427,10 +438,9 @@ export default function Auth({ mode, onAuthSuccess, onSwitchMode, onClearSession
                   onChange={e => setBusinessCategory(e.target.value)}
                   className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 pl-10 pr-4 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors appearance-none"
                 >
-                  <option value="Salon & Grooming">Salon & Grooming (सैलून)</option>
-                  <option value="Spa & Wellness">Spa & Wellness (स्पा)</option>
-                  <option value="Gym & Fitness">Gym & Fitness (जिम)</option>
-                  <option value="Clinic & Care">Clinic & Care (क्लिनिक)</option>
+                  {SHOP_CATEGORIES.map(cat => (
+                    <option key={cat.value} value={cat.value}>{cat.label}</option>
+                  ))}
                 </select>
               </div>
             </div>

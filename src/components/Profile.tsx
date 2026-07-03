@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Camera, User, Store, Briefcase, Users, Ban, Bell, HelpCircle, LogOut, ChevronRight, ShieldAlert, MessageSquare, MessageCircle, FileQuestion, ChevronLeft, Mail, Smartphone } from 'lucide-react';
 import { dbMock } from '../lib/dbMock';
+import { SHOP_CATEGORIES } from '../constants/categories';
 import { uploadFile, STORAGE_BUCKETS, isSupabaseConfigured } from '../lib/supabase';
 import { Owner, Shop, BlockedSlot } from '../types';
 
@@ -30,6 +31,7 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
   const [editShopAddress, setEditShopAddress] = useState(shop.address || '');
   const [editShopCity, setEditShopCity] = useState(shop.city || '');
   const [editShopArea, setEditShopArea] = useState(shop.area || '');
+  const [editShopCategory, setEditShopCategory] = useState(shop.type || SHOP_CATEGORIES[2].value);
   const [editShopOpen, setEditShopOpen] = useState(shop.opening_time || '09:00 AM');
   const [editShopClose, setEditShopClose] = useState(shop.closing_time || '08:00 PM');
   const [shopLogo, setShopLogo] = useState(shop.logo_url || '');
@@ -89,6 +91,7 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
         address: editShopAddress,
         city: editShopCity,
         area: editShopArea,
+        type: editShopCategory,
         opening_time: editShopOpen,
         closing_time: editShopClose,
         logo_url: shopLogo
@@ -178,7 +181,7 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
               <div>
                 <span className="text-[8px] font-bold text-slate-400 uppercase">Category</span>
-                <p className="text-[10px] font-bold text-[#0F172A]">{shop.category || 'Salon & Spa'}</p>
+                <p className="text-[10px] font-bold text-[#0F172A]">{shop.type || 'Salon'}</p>
               </div>
               <div>
                 <span className="text-[8px] font-bold text-slate-400 uppercase">Location</span>
@@ -434,6 +437,19 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
                       className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Business Category *</label>
+                  <select
+                    value={editShopCategory}
+                    onChange={e => setEditShopCategory(e.target.value)}
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
+                  >
+                    {SHOP_CATEGORIES.map(cat => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-2">

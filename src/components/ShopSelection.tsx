@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Store, Plus, MapPin, Phone, Star, ArrowRight, X, Sparkles } from 'lucide-react';
 import { dbMock } from '../lib/dbMock';
+import { SHOP_CATEGORIES } from '../constants/categories';
 import { Shop, Owner } from '../types';
 
 interface ShopSelectionProps {
@@ -20,7 +21,7 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
 
   // Form states
   const [name, setName] = useState('');
-  const [type, setType] = useState('Salon & Grooming');
+  const [type, setType] = useState(SHOP_CATEGORIES[2].value); // Default to 'Salon'
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [upi, setUpi] = useState('');
@@ -227,10 +228,9 @@ export default function ShopSelection({ owner, onSelectShop }: ShopSelectionProp
                 onChange={e => setType(e.target.value)}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl py-2.5 px-3.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-colors"
               >
-                <option value="Salon & Grooming">Salon & Grooming (सैलून)</option>
-                <option value="Spa & Wellness">Spa & Wellness (स्पा)</option>
-                <option value="Gym & Fitness">Gym & Fitness (जिम)</option>
-                <option value="Clinic & Care">Clinic & Care (क्लिनिक)</option>
+                {SHOP_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
               </select>
             </div>
 

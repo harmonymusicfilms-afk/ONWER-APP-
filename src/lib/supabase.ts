@@ -45,3 +45,42 @@ export const supabase = new Proxy({} as SupabaseClient, {
     return (getSupabase() as any)[prop];
   }
 });
+
+/**
+ * Verify Supabase connection and schema
+ */
+export const verifyConnection = async () => {
+  if (!isSupabaseConfigured()) {
+    console.warn('⚠️ Supabase connection skipped: Keys are missing in environment.');
+    return false;
+  }
+  
+  try {
+    const sb = getSupabase();
+    
+    // Check session/auth
+    const { error: authError } = await sb.auth.getSession();
+    if (authError) throw authError;
+    
+    // Check profiles table (most common starting point)
+    const { error: profileError } = await sb.from('profiles').select('id').limit(1);
+    
+    // If it's a 404 (PGRST116 or similar), it might just mean no rows or table doesn't exist yet
+    // but if we get a response, the connection is alive
+    if (profileError && profileError.code !== 'PGRST116') {
+       console.warn('⚡ Supabase connected but profiles table check returned:', profileError.message);
+    } else {
+       console.log('✅ Supabase connection verified successfully!');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Supabase connection failed:', error);
+    return false;
+  }
+};
+
+// Run verification in the background
+if (typeof window !== 'undefined') {
+  verifyConnection().catch(console.error);
+}
