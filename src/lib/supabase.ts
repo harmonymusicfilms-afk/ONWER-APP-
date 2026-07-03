@@ -6,6 +6,24 @@ export const isSupabaseConfigured = (): boolean => {
   return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
 };
 
+export const STORAGE_BUCKETS = {
+  LOGOS: 'shop-logos',
+  STAFF: 'staff-photos',
+  GALLERY: 'gallery',
+  PROFILES: 'profiles'
+} as const;
+
+export const uploadFile = async (bucket: string, path: string, file: File) => {
+  const sb = getSupabase();
+  const { data, error } = await sb.storage.from(bucket).upload(path, file, {
+    upsert: true
+  });
+  if (error) throw error;
+  
+  const { data: { publicUrl } } = sb.storage.from(bucket).getPublicUrl(data.path);
+  return publicUrl;
+};
+
 export const getSupabase = (): SupabaseClient => {
   if (!supabaseInstance) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

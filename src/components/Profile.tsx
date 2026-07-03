@@ -5,25 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import {
-  User,
-  Store,
-  Briefcase,
-  Users,
-  Ban,
-  Bell,
-  HelpCircle,
-  LogOut,
-  ChevronRight,
-  ShieldAlert,
-  MessageSquare,
-  MessageCircle,
-  FileQuestion,
-  ChevronLeft,
-  Mail,
-  Smartphone
-} from 'lucide-react';
+import { Camera, User, Store, Briefcase, Users, Ban, Bell, HelpCircle, LogOut, ChevronRight, ShieldAlert, MessageSquare, MessageCircle, FileQuestion, ChevronLeft, Mail, Smartphone } from 'lucide-react';
 import { dbMock } from '../lib/dbMock';
+import { uploadFile, STORAGE_BUCKETS, isSupabaseConfigured } from '../lib/supabase';
 import { Owner, Shop, BlockedSlot } from '../types';
 
 interface ProfileProps {
@@ -48,11 +32,52 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
   const [editShopArea, setEditShopArea] = useState(shop.area || '');
   const [editShopOpen, setEditShopOpen] = useState(shop.opening_time || '09:00 AM');
   const [editShopClose, setEditShopClose] = useState(shop.closing_time || '08:00 PM');
+  const [shopLogo, setShopLogo] = useState(shop.logo_url || '');
+  const [ownerAvatar, setOwnerAvatar] = useState(owner.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingOwner, setIsUploadingOwner] = useState(false);
 
   useEffect(() => {
     setBlockedSlots(dbMock.getBlockedSlots(shop.id));
   }, [shop.id]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isSupabaseConfigured()) return;
+
+    setIsUploading(true);
+    try {
+      const path = `${shop.id}/logo_${Date.now()}.${file.name.split('.').pop()}`;
+      const url = await uploadFile(STORAGE_BUCKETS.LOGOS, path, file);
+      setShopLogo(url);
+      dbMock.saveShop(shop.id, { logo_url: url });
+    } catch (err) {
+      console.error('Logo upload failed:', err);
+      alert('Failed to upload logo.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleOwnerAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isSupabaseConfigured()) return;
+
+    setIsUploadingOwner(true);
+    try {
+      const path = `${owner.id}/profile_${Date.now()}.${file.name.split('.').pop()}`;
+      const url = await uploadFile(STORAGE_BUCKETS.PROFILES, path, file);
+      setOwnerAvatar(url);
+      // Note: dbMock doesn't have saveOwner but we can simulate it if needed
+      // For now we just update local state and assume it's saved in owner profile
+    } catch (err) {
+      console.error('Owner avatar upload failed:', err);
+      alert('Failed to upload profile photo.');
+    } finally {
+      setIsUploadingOwner(false);
+    }
+  };
 
   const handleUpdateShop = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +90,8 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
         city: editShopCity,
         area: editShopArea,
         opening_time: editShopOpen,
-        closing_time: editShopClose
+        closing_time: editShopClose,
+        logo_url: shopLogo
       });
       setTimeout(() => {
         setIsSaving(false);
@@ -104,8 +130,23 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
         <div className="p-4 space-y-4">
           {/* Owner details top card */}
           <div className="bg-white rounded-2xl p-4 border border-[#E2E8F0] shadow-sm flex items-center gap-3.5 mt-2">
-            <div className="w-12 h-12 bg-[#0F172A] text-white rounded-2xl flex items-center justify-center font-extrabold text-base">
-              {owner.name.charAt(0)}
+            <div className="relative group">
+              <div className="w-14 h-14 bg-[#0F172A] text-white rounded-2xl flex items-center justify-center font-extrabold text-lg overflow-hidden border-2 border-white shadow-sm">
+                {ownerAvatar ? (
+                  <img src={ownerAvatar} alt={owner.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  owner.name.charAt(0)
+                )}
+                {isUploadingOwner && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <label className="absolute -bottom-1 -right-1 p-1 bg-white border border-slate-100 rounded-lg shadow-md cursor-pointer hover:bg-slate-50 transition-all opacity-0 group-hover:opacity-100">
+                <Camera className="w-3 h-3 text-slate-600" />
+                <input type="file" className="hidden" accept="image/*" onChange={handleOwnerAvatarUpload} disabled={isUploadingOwner} />
+              </label>
             </div>
             <div>
               <h3 className="text-base font-black text-[#0F172A]">{owner.name}</h3>
@@ -320,6 +361,28 @@ export default function Profile({ owner, shop, screenMode, onNavigateTo, onLogou
           </div>
 
           <div className="bg-white rounded-3xl p-5 border border-[#E2E8F0] shadow-sm overflow-hidden">
+            <div className="flex flex-col items-center mb-6">
+              <div className="relative">
+                <div className="w-24 h-24 bg-slate-100 rounded-2xl overflow-hidden border-2 border-white shadow-md flex items-center justify-center">
+                  {shopLogo ? (
+                    <img src={shopLogo} alt="Shop Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Store className="w-10 h-10 text-slate-300" />
+                  )}
+                  {isUploading && (
+                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+                <label className="absolute -bottom-2 -right-2 p-2 bg-[#2563EB] text-white rounded-xl shadow-lg cursor-pointer hover:bg-blue-700 transition-colors">
+                  <Camera className="w-4 h-4" />
+                  <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={isUploading} />
+                </label>
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 mt-3 uppercase tracking-wider">Shop Logo</p>
+            </div>
+
             <form onSubmit={handleUpdateShop} className="space-y-4">
               <div className="space-y-4">
                 <div>

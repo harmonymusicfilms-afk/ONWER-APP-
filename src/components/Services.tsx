@@ -5,19 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import {
-  Briefcase,
-  Plus,
-  Clock,
-  ChevronLeft,
-  X,
-  Edit2,
-  Trash2,
-  ToggleLeft,
-  ToggleRight,
-  Info
-} from 'lucide-react';
+import { Briefcase, Plus, Clock, ChevronLeft, X, Edit2, Trash2, ToggleLeft, ToggleRight, Info, Camera } from 'lucide-react';
 import { dbMock } from '../lib/dbMock';
+import { uploadFile, STORAGE_BUCKETS, isSupabaseConfigured } from '../lib/supabase';
 import { Service, Shop } from '../types';
 
 interface ServicesProps {
@@ -37,7 +27,9 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
   const [category, setCategory] = useState('Hair');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [image, setImage] = useState('');
   const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
@@ -45,6 +37,23 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
   const triggerToast = (msg: string) => {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isSupabaseConfigured()) return;
+
+    setIsUploading(true);
+    try {
+      const path = `${shop.id}/service_${Date.now()}.${file.name.split('.').pop()}`;
+      const url = await uploadFile(STORAGE_BUCKETS.GALLERY, path, file);
+      setImage(url);
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      triggerToast('Failed to upload image.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const loadData = () => {
@@ -58,6 +67,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
       setCategory(selectedServiceData.category);
       setDescription(selectedServiceData.description || '');
       setIsActive(selectedServiceData.is_active);
+      setImage(selectedServiceData.image_url || '');
     } else if (screenMode === 'add_edit') {
       // Clear form
       setName('');
@@ -66,6 +76,7 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
       setCategory('Hair');
       setDescription('');
       setIsActive(true);
+      setImage('');
     }
   };
 
@@ -89,7 +100,8 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
         price,
         category,
         description: description.trim(),
-        is_active: isActive
+        is_active: isActive,
+        image_url: image
       });
 
       triggerToast(selectedServiceData ? 'Service updated!' : 'Service created successfully!');
@@ -242,6 +254,29 @@ export default function Services({ shop, screenMode, selectedServiceData, onNavi
             )}
 
             <form onSubmit={handleSave} className="space-y-4">
+              {/* Service Image Upload */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="relative">
+                  <div className="w-24 h-16 bg-slate-100 rounded-xl overflow-hidden border-2 border-white shadow-sm flex items-center justify-center">
+                    {image ? (
+                      <img src={image} alt="Service" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <Briefcase className="w-6 h-6 text-slate-300" />
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                  <label className="absolute -bottom-1 -right-1 p-1.5 bg-[#2563EB] text-white rounded-lg shadow-md cursor-pointer hover:bg-blue-700 transition-colors">
+                    <Camera className="w-3 h-3" />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+                  </label>
+                </div>
+                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-wider">Service Image</p>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
                   Service Name (सर्विस का नाम) *

@@ -9,6 +9,7 @@ export interface Owner {
   name: string;
   phone: string;
   role?: string;
+  avatar?: string;
 }
 
 export interface Shop {
@@ -27,6 +28,7 @@ export interface Shop {
   opening_time?: string;
   closing_time?: string;
   is_active?: boolean;
+  logo_url?: string;
 }
 
 export interface Service {
@@ -38,6 +40,7 @@ export interface Service {
   category: string;
   description?: string;
   is_active: boolean;
+  image_url?: string;
 }
 
 export interface Staff {

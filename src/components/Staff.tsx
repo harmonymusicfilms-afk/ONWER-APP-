@@ -5,20 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import {
-  Users,
-  Plus,
-  Phone,
-  ChevronLeft,
-  X,
-  Edit2,
-  Trash2,
-  ToggleLeft,
-  ToggleRight,
-  Star,
-  Sparkles
-} from 'lucide-react';
+import { Users, Plus, Phone, ChevronLeft, X, Edit2, Trash2, ToggleLeft, ToggleRight, Star, Sparkles, Camera } from 'lucide-react';
 import { dbMock } from '../lib/dbMock';
+import { uploadFile, STORAGE_BUCKETS, isSupabaseConfigured } from '../lib/supabase';
 import { Staff, Shop } from '../types';
 
 interface StaffProps {
@@ -41,6 +30,7 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
   const [openingTime, setOpeningTime] = useState('09:00');
   const [closingTime, setClosingTime] = useState('21:00');
   const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
@@ -48,6 +38,23 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
   const triggerToast = (msg: string) => {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: '' }), 3000);
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isSupabaseConfigured()) return;
+
+    setIsUploading(true);
+    try {
+      const path = `${shop.id}/staff_${Date.now()}.${file.name.split('.').pop()}`;
+      const url = await uploadFile(STORAGE_BUCKETS.STAFF, path, file);
+      setAvatar(url);
+    } catch (err) {
+      console.error('Avatar upload failed:', err);
+      triggerToast('Failed to upload photo.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const loadData = () => {
@@ -310,30 +317,27 @@ export default function StaffList({ shop, screenMode, selectedStaffData, onNavig
                 />
               </div>
 
-              {/* Avatar Selector Gallery */}
-              <div>
-                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">
-                  Choose Profile Avatar
-                </label>
-                <div className="flex gap-3">
-                  {[
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&q=80',
-                    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&q=80',
-                    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&q=80',
-                    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&q=80'
-                  ].map((url, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setAvatar(url)}
-                      className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 transition-all ${
-                        avatar === url ? 'border-[#2563EB] scale-105' : 'border-transparent opacity-70'
-                      }`}
-                    >
-                      <img src={url} alt="preset avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </button>
-                  ))}
+              {/* Avatar Upload */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="relative">
+                  <div className="w-20 h-20 bg-slate-100 rounded-2xl overflow-hidden border-2 border-white shadow-sm flex items-center justify-center">
+                    {avatar ? (
+                      <img src={avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <Users className="w-8 h-8 text-slate-300" />
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                  <label className="absolute -bottom-1 -right-1 p-1.5 bg-[#2563EB] text-white rounded-lg shadow-md cursor-pointer hover:bg-blue-700 transition-colors">
+                    <Camera className="w-3 h-3" />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={isUploading} />
+                  </label>
                 </div>
+                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-wider">Staff Photo</p>
               </div>
 
               <div className="flex items-center gap-3 bg-[#F8FAFC] p-3 rounded-xl border border-[#E2E8F0]">
