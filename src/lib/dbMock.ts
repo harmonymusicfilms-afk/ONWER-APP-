@@ -37,7 +37,7 @@ const KEYS = {
 };
 
 // Initial Data Seeds
-const seedOwners: Owner[] = [
+export const seedOwners: Owner[] = [
   {
     id: 'owner-1',
     email: 'harmonymusicfilms@gmail.com',

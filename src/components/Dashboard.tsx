@@ -22,10 +22,12 @@ import {
   Smartphone,
   Plus,
   Share2,
-  Wallet
+  Wallet,
+  MessageCircle
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dbMock } from '../lib/dbMock';
+import { supabase } from '../lib/supabase';
 import { Booking, Shop, AppNotification, Service, Staff, Owner, BlockedSlot, SalonWallet } from '../types';
 
 interface DashboardProps {
@@ -66,26 +68,63 @@ export default function Dashboard({ shop, owner, onNavigateTo }: DashboardProps)
     msg: '',
     type: 'success'
   });
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   };
 
-  const loadData = () => {
+  const loadData = async () => {
     setBookings(dbMock.getBookings(shop.id));
     setNotifications(dbMock.getNotifications(shop.id));
     setServices(dbMock.getServices(shop.id));
     setStaff(dbMock.getStaff(shop.id));
     setBlockedSlots(dbMock.getBlockedSlots(shop.id));
     setWallet(dbMock.getWallet(shop.id));
+
+    // Fetch unread chat count from Supabase
+    try {
+      const { data, error } = await supabase
+        .from('chat_rooms')
+        .select('unread_count_shop')
+        .eq('shop_id', shop.id);
+      
+      if (!error && data) {
+        const count = data.reduce((sum, room) => sum + (room.unread_count_shop || 0), 0);
+        setUnreadChatCount(count);
+      }
+    } catch (err) {
+      console.error('Error fetching unread chat count:', err);
+    }
   };
 
   useEffect(() => {
     loadData();
     // Refresh stats periodically
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(loadData, 10000);
+
+    // Subscribe to chat room updates for real-time unread count
+    const channel = supabase
+      .channel('dashboard_chat_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_rooms',
+          filter: `shop_id=eq.${shop.id}`
+        },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [shop.id]);
 
   // Derive stats
@@ -283,7 +322,16 @@ export default function Dashboard({ shop, owner, onNavigateTo }: DashboardProps)
             }, ${owner?.name || 'Sanjeev Kumar'}`}</h1>
             <p className="text-xs text-[#64748B] font-medium">{shop.name}</p>
           </div>
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+            <button
+              onClick={() => onNavigateTo('chat_list')}
+              className="w-10 h-10 bg-slate-50 hover:bg-slate-100 rounded-full flex items-center justify-center relative border border-slate-100 transition-colors"
+            >
+              <MessageCircle className="w-5 h-5 text-[#64748B]" />
+              {unreadChatCount > 0 && (
+                <span className="absolute top-0 right-0 w-3 h-3 bg-indigo-600 border-2 border-white rounded-full animate-pulse" />
+              )}
+            </button>
             <button
               onClick={() => onNavigateTo('notifications')}
               className="w-10 h-10 bg-slate-50 hover:bg-slate-100 rounded-full flex items-center justify-center relative border border-slate-100 transition-colors"

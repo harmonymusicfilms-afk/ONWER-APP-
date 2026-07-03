@@ -160,6 +160,32 @@ export interface Review {
   created_at: string;
 }
 
+export interface ChatRoom {
+  id: string;
+  shop_id: string;
+  customer_id?: string;
+  booking_id?: string; // Add booking_id
+  customer_name: string;
+  customer_phone?: string;
+  last_message?: string;
+  last_message_at?: string;
+  unread_count_shop: number;
+  unread_count_customer: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  sender_id?: string;
+  sender_role: 'shop' | 'customer';
+  message: string;
+  image_url?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
 export type ScreenType =
   | 'splash'
   | 'login'
@@ -181,4 +207,7 @@ export type ScreenType =
   | 'profile'
   | 'help'
   | 'edit_shop'
-  | 'unauthorized';
+  | 'unauthorized'
+  | 'role_setup'
+  | 'chat_list'
+  | 'chat_detail';

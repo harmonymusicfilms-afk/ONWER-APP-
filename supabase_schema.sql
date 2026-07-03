@@ -12,11 +12,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- 2. User Roles Table
 CREATE TABLE IF NOT EXISTS public.user_roles (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE,
     role TEXT CHECK (role IN ('shop_owner', 'staff', 'customer', 'super_admin', 'partner')) DEFAULT 'shop_owner',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(user_id)
+    CONSTRAINT user_roles_pkey PRIMARY KEY (user_id)
 );
 
 -- 3. Shops Table
@@ -161,6 +160,33 @@ CREATE TABLE IF NOT EXISTS public.wallet_transactions (
     date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 14. Chat Rooms
+CREATE TABLE IF NOT EXISTS public.chat_rooms (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
+    customer_id UUID,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT,
+    last_message TEXT,
+    last_message_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    unread_count_shop INTEGER DEFAULT 0,
+    unread_count_customer INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 15. Chat Messages
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    room_id UUID REFERENCES public.chat_rooms ON DELETE CASCADE NOT NULL,
+    sender_id UUID,
+    sender_role TEXT CHECK (sender_role IN ('shop', 'customer')) NOT NULL,
+    message TEXT,
+    image_url TEXT,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- ENABLE ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
@@ -175,8 +201,32 @@ ALTER TABLE public.salon_wallets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- CREATE RLS POLICIES
+
+-- Chat Rooms
+CREATE POLICY "Owners can view chat rooms for their shops" ON public.chat_rooms FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
+);
+CREATE POLICY "Owners can manage chat rooms for their shops" ON public.chat_rooms FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
+);
+CREATE POLICY "Customers can view their own chat rooms" ON public.chat_rooms FOR SELECT USING (
+    customer_id = auth.uid() OR auth.uid() IS NULL -- Allow public leads for now or refine if auth required
+);
+
+-- Chat Messages
+CREATE POLICY "Owners can view messages for their rooms" ON public.chat_messages FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.chat_rooms cr JOIN public.shops s ON cr.shop_id = s.id WHERE cr.id = room_id AND s.owner_id = auth.uid())
+);
+CREATE POLICY "Owners can insert messages for their rooms" ON public.chat_messages FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.chat_rooms cr JOIN public.shops s ON cr.shop_id = s.id WHERE cr.id = room_id AND s.owner_id = auth.uid())
+);
+CREATE POLICY "Customers can view/insert their own messages" ON public.chat_messages FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.chat_rooms WHERE id = room_id AND (customer_id = auth.uid() OR auth.uid() IS NULL))
+);
 
 -- Profiles: Users can only read/write their own profile
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
@@ -257,10 +307,12 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.profiles (id, full_name)
-  VALUES (new.id, new.raw_user_meta_data->>'full_name');
+  VALUES (new.id, new.raw_user_meta_data->>'full_name')
+  ON CONFLICT (id) DO NOTHING;
   
   INSERT INTO public.user_roles (user_id, role)
-  VALUES (new.id, 'shop_owner');
+  VALUES (new.id, 'shop_owner')
+  ON CONFLICT (user_id) DO NOTHING;
   
   RETURN new;
 END;
