@@ -160,29 +160,38 @@ export interface Review {
   created_at: string;
 }
 
-export interface ChatRoom {
+export interface ChatThread {
   id: string;
   shop_id: string;
-  customer_id?: string;
-  booking_id?: string; // Add booking_id
-  customer_name: string;
-  customer_phone?: string;
+  customer_id: string;
+  owner_id?: string;
+  booking_id?: string;
   last_message?: string;
   last_message_at?: string;
-  unread_count_shop: number;
-  unread_count_customer: number;
+  customer_unread: number;
+  owner_unread: number;
+  status: 'active' | 'archived' | 'muted';
   created_at: string;
-  updated_at: string;
+  customer_name?: string;
+  customer_avatar?: string;
+  is_online?: boolean;
+  last_seen?: string;
+  is_typing?: boolean;
 }
 
 export interface ChatMessage {
   id: string;
-  room_id: string;
-  sender_id?: string;
-  sender_role: 'shop' | 'customer';
-  message: string;
+  thread_id: string;
+  sender_id: string;
+  sender_role: 'shop_owner' | 'customer';
+  message_type: 'text' | 'image' | 'booking_card' | 'system' | 'voice' | 'service_card' | 'location' | 'offer_card' | 'payment_confirmation';
+  message?: string;
   image_url?: string;
   is_read: boolean;
+  delivered: boolean;
+  reply_to_id?: string;
+  is_starred: boolean;
+  metadata?: any;
   created_at: string;
 }
 
@@ -210,4 +219,5 @@ export type ScreenType =
   | 'unauthorized'
   | 'role_setup'
   | 'chat_list'
-  | 'chat_detail';
+  | 'chat_detail'
+  | 'rewards';

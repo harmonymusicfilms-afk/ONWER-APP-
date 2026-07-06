@@ -1,6 +1,6 @@
 {
-  "name": "Nexora Owner",
-  "description": "Mobile-first PWA dashboard app for Nexora shop owners to manage bookings, customers, services, staff, blocked slots, and earnings.",
+  "name": "Nexora",
+  "description": "Premium multi-role PWA for Nexora ecosystem. Includes Owner Dashboard for business management and Customer App for booking, rewards, and real-time chat.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

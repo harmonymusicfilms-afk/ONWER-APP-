@@ -1,323 +1,102 @@
--- NEXORA SALON OS - SUPABASE SCHEMA
--- Copy and run this in your Supabase SQL Editor
+-- Enable Realtime for these tables
+ALTER TABLE chat_threads REPLICA IDENTITY FULL;
+ALTER TABLE chat_messages REPLICA IDENTITY FULL;
 
--- 1. Profiles Table
-CREATE TABLE IF NOT EXISTS public.profiles (
-    id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-    full_name TEXT,
-    phone TEXT,
-    avatar_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+-- Add to Realtime Publication
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime FOR TABLE chat_threads, chat_messages;
+COMMIT;
 
--- 2. User Roles Table
-CREATE TABLE IF NOT EXISTS public.user_roles (
-    user_id UUID REFERENCES auth.users ON DELETE CASCADE,
-    role TEXT CHECK (role IN ('shop_owner', 'staff', 'customer', 'super_admin', 'partner')) DEFAULT 'shop_owner',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    CONSTRAINT user_roles_pkey PRIMARY KEY (user_id)
-);
-
--- 3. Shops Table
-CREATE TABLE IF NOT EXISTS public.shops (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    owner_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL,
-    category TEXT,
-    address TEXT,
-    city TEXT,
-    area TEXT,
-    phone TEXT,
-    rating DECIMAL DEFAULT 5.0,
-    upi_id TEXT,
-    logo_url TEXT,
-    opening_time TEXT DEFAULT '09:00 AM',
-    closing_time TEXT DEFAULT '08:00 PM',
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 4. Services Table
-CREATE TABLE IF NOT EXISTS public.services (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
-    price DECIMAL NOT NULL,
-    duration INTEGER NOT NULL, -- minutes
-    category TEXT NOT NULL,
-    description TEXT,
-    image_url TEXT,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 5. Staff Table
-CREATE TABLE IF NOT EXISTS public.staff (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
-    role TEXT,
-    phone TEXT,
-    avatar TEXT,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 6. Customers Table
-CREATE TABLE IF NOT EXISTS public.customers (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    email TEXT,
-    total_visits INTEGER DEFAULT 0,
-    total_spent DECIMAL DEFAULT 0,
-    last_visit TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(shop_id, phone)
-);
-
--- 7. Bookings Table
-CREATE TABLE IF NOT EXISTS public.bookings (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    customer_name TEXT NOT NULL,
-    customer_phone TEXT NOT NULL,
-    service_id UUID REFERENCES public.services ON DELETE SET NULL,
-    service_name TEXT NOT NULL,
-    price DECIMAL NOT NULL,
-    staff_id UUID REFERENCES public.staff ON DELETE SET NULL,
-    staff_name TEXT NOT NULL,
-    date DATE NOT NULL,
-    time_slot TEXT NOT NULL,
-    status TEXT CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled', 'no_show')) DEFAULT 'pending',
-    payment_status TEXT CHECK (payment_status IN ('pending', 'paid_cash', 'paid_online')) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 8. Blocked Time Slots
-CREATE TABLE IF NOT EXISTS public.blocked_time_slots (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    staff_id UUID REFERENCES public.staff ON DELETE CASCADE,
-    date DATE NOT NULL,
-    time_slot TEXT NOT NULL,
-    reason TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 9. Notifications Table
-CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    title TEXT NOT NULL,
-    message TEXT NOT NULL,
-    type TEXT DEFAULT 'system',
-    is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 10. Salon Wallets
-CREATE TABLE IF NOT EXISTS public.salon_wallets (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    balance DECIMAL DEFAULT 0,
-    total_earnings DECIMAL DEFAULT 0,
-    pending_payouts DECIMAL DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(shop_id)
-);
-
--- 11. Reviews Table
-CREATE TABLE IF NOT EXISTS public.reviews (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    customer_name TEXT NOT NULL,
-    rating INTEGER NOT NULL,
-    comment TEXT,
-    date DATE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 12. Withdrawals Table
-CREATE TABLE IF NOT EXISTS public.withdrawals (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    amount DECIMAL NOT NULL,
-    status TEXT CHECK (status IN ('pending', 'completed', 'failed')) DEFAULT 'pending',
-    requested_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    completed_at TIMESTAMP WITH TIME ZONE
-);
-
--- 13. Wallet Transactions
-CREATE TABLE IF NOT EXISTS public.wallet_transactions (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    type TEXT CHECK (type IN ('earning', 'withdrawal', 'refund')) NOT NULL,
-    amount DECIMAL NOT NULL,
-    description TEXT,
-    date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 14. Chat Rooms
-CREATE TABLE IF NOT EXISTS public.chat_rooms (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    shop_id UUID REFERENCES public.shops ON DELETE CASCADE NOT NULL,
-    customer_id UUID,
-    customer_name TEXT NOT NULL,
-    customer_phone TEXT,
+-- Chat Threads Table
+CREATE TABLE IF NOT EXISTS chat_threads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL,
+    customer_id UUID NOT NULL,
+    booking_id UUID,
+    owner_id UUID,
     last_message TEXT,
-    last_message_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-    unread_count_shop INTEGER DEFAULT 0,
-    unread_count_customer INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    last_message_at TIMESTAMPTZ DEFAULT now(),
+    customer_unread INTEGER DEFAULT 0,
+    owner_unread INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active',
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 15. Chat Messages
-CREATE TABLE IF NOT EXISTS public.chat_messages (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    room_id UUID REFERENCES public.chat_rooms ON DELETE CASCADE NOT NULL,
-    sender_id UUID,
-    sender_role TEXT CHECK (sender_role IN ('shop', 'customer')) NOT NULL,
+-- Chat Messages Table
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thread_id UUID REFERENCES chat_threads(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL,
+    sender_role TEXT NOT NULL, -- 'owner' or 'customer'
+    message_type TEXT DEFAULT 'text', -- 'text', 'image', 'booking_card', 'system'
     message TEXT,
     image_url TEXT,
     is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    delivered BOOLEAN DEFAULT true,
+    reply_to_id UUID REFERENCES chat_messages(id) ON DELETE SET NULL,
+    is_starred BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ENABLE ROW LEVEL SECURITY (RLS)
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.shops ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.blocked_time_slots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.salon_wallets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_rooms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
-
--- CREATE RLS POLICIES
-
--- Chat Rooms
-CREATE POLICY "Owners can view chat rooms for their shops" ON public.chat_rooms FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage chat rooms for their shops" ON public.chat_rooms FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Customers can view their own chat rooms" ON public.chat_rooms FOR SELECT USING (
-    customer_id = auth.uid() OR auth.uid() IS NULL -- Allow public leads for now or refine if auth required
+-- Chat Media Table
+CREATE TABLE IF NOT EXISTS chat_media (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    message_id UUID REFERENCES chat_messages(id) ON DELETE CASCADE,
+    storage_path TEXT NOT NULL,
+    type TEXT NOT NULL, -- 'image', 'document', etc.
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Chat Messages
-CREATE POLICY "Owners can view messages for their rooms" ON public.chat_messages FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.chat_rooms cr JOIN public.shops s ON cr.shop_id = s.id WHERE cr.id = room_id AND s.owner_id = auth.uid())
-);
-CREATE POLICY "Owners can insert messages for their rooms" ON public.chat_messages FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.chat_rooms cr JOIN public.shops s ON cr.shop_id = s.id WHERE cr.id = room_id AND s.owner_id = auth.uid())
-);
-CREATE POLICY "Customers can view/insert their own messages" ON public.chat_messages FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.chat_rooms WHERE id = room_id AND (customer_id = auth.uid() OR auth.uid() IS NULL))
-);
+-- Enable RLS
+ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_media ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Users can only read/write their own profile
-CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+-- CUSTOMER POLICIES
+CREATE POLICY "Customers can view their own threads" ON chat_threads
+    FOR SELECT USING (auth.uid() = customer_id);
 
--- User Roles: Users can read their own role
-CREATE POLICY "Users can view own role" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Customers can create threads" ON chat_threads
+    FOR INSERT WITH CHECK (auth.uid() = customer_id);
 
--- Shops: Owners can only see/edit their own shops
-CREATE POLICY "Owners can view own shops" ON public.shops FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can update own shops" ON public.shops FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can insert own shops" ON public.shops FOR INSERT WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Customers can update their own threads" ON chat_threads
+    FOR UPDATE USING (auth.uid() = customer_id);
 
--- Filtered by shop_id and owner_id for all sub-tables
--- Bookings
-CREATE POLICY "Owners can view bookings for their shops" ON public.bookings FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage bookings for their shops" ON public.bookings FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
+-- OWNER POLICIES
+CREATE POLICY "Owners can view their shop threads" ON chat_threads
+    FOR SELECT USING (auth.uid() = owner_id);
 
--- Services
-CREATE POLICY "Owners can view services for their shops" ON public.services FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage services for their shops" ON public.services FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
+CREATE POLICY "Owners can update their shop threads" ON chat_threads
+    FOR UPDATE USING (auth.uid() = owner_id);
 
--- Staff
-CREATE POLICY "Owners can view staff for their shops" ON public.staff FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage staff for their shops" ON public.staff FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
+-- MESSAGE POLICIES
+CREATE POLICY "Users can view messages in their threads" ON chat_messages
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM chat_threads 
+            WHERE chat_threads.id = chat_messages.thread_id 
+            AND (chat_threads.customer_id = auth.uid() OR chat_threads.owner_id = auth.uid())
+        )
+    );
 
--- Customers
-CREATE POLICY "Owners can view customers for their shops" ON public.customers FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage customers for their shops" ON public.customers FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
+CREATE POLICY "Users can insert messages in their threads" ON chat_messages
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM chat_threads 
+            WHERE chat_threads.id = chat_messages.thread_id 
+            AND (chat_threads.customer_id = auth.uid() OR chat_threads.owner_id = auth.uid())
+        )
+    );
 
--- Blocked Slots
-CREATE POLICY "Owners can view blocked slots for their shops" ON public.blocked_time_slots FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage blocked slots for their shops" ON public.blocked_time_slots FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-
--- Notifications
-CREATE POLICY "Owners can view notifications for their shops" ON public.notifications FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-CREATE POLICY "Owners can manage notifications for their shops" ON public.notifications FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-
--- Wallet
-CREATE POLICY "Owners can view wallet for their shops" ON public.salon_wallets FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-
--- Reviews
-CREATE POLICY "Owners can view reviews for their shops" ON public.reviews FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shops WHERE id = shop_id AND owner_id = auth.uid())
-);
-
--- FUNCTIONS & TRIGGERS
-
--- Automatically create profile and role on signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+-- Function to increment unread counts atomically
+CREATE OR REPLACE FUNCTION increment_unread(t_id UUID, role TEXT)
+RETURNS VOID AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name)
-  VALUES (new.id, new.raw_user_meta_data->>'full_name')
-  ON CONFLICT (id) DO NOTHING;
-  
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (new.id, 'shop_owner')
-  ON CONFLICT (user_id) DO NOTHING;
-  
-  RETURN new;
+    IF role = 'customer' THEN
+        UPDATE chat_threads SET customer_unread = customer_unread + 1 WHERE id = t_id;
+    ELSIF role = 'owner' THEN
+        UPDATE chat_threads SET owner_unread = owner_unread + 1 WHERE id = t_id;
+    END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+$$ LANGUAGE plpgsql;

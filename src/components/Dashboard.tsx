@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dbMock } from '../lib/dbMock';
-import { supabase } from '../lib/supabase';
+import { supabase, isValidUUID } from '../lib/supabase';
 import { Booking, Shop, AppNotification, Service, Staff, Owner, BlockedSlot, SalonWallet } from '../types';
 
 interface DashboardProps {
@@ -84,18 +84,20 @@ export default function Dashboard({ shop, owner, onNavigateTo }: DashboardProps)
     setWallet(dbMock.getWallet(shop.id));
 
     // Fetch unread chat count from Supabase
-    try {
-      const { data, error } = await supabase
-        .from('chat_rooms')
-        .select('unread_count_shop')
-        .eq('shop_id', shop.id);
-      
-      if (!error && data) {
-        const count = data.reduce((sum, room) => sum + (room.unread_count_shop || 0), 0);
-        setUnreadChatCount(count);
+    if (isValidUUID(shop.id)) {
+      try {
+        const { data, error } = await supabase
+          .from('chat_threads')
+          .select('owner_unread')
+          .eq('shop_id', shop.id);
+        
+        if (!error && data) {
+          const count = data.reduce((sum, room) => sum + (room.owner_unread || 0), 0);
+          setUnreadChatCount(count);
+        }
+      } catch (err) {
+        console.error('Error fetching unread chat count:', err);
       }
-    } catch (err) {
-      console.error('Error fetching unread chat count:', err);
     }
   };
 
@@ -104,26 +106,32 @@ export default function Dashboard({ shop, owner, onNavigateTo }: DashboardProps)
     // Refresh stats periodically
     const interval = setInterval(loadData, 10000);
 
-    // Subscribe to chat room updates for real-time unread count
-    const channel = supabase
-      .channel('dashboard_chat_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'chat_rooms',
-          filter: `shop_id=eq.${shop.id}`
-        },
-        () => {
-          loadData();
-        }
-      )
-      .subscribe();
+    let channel: any = null;
+
+    // Subscribe to chat room updates for real-time unread count if shop.id is valid
+    if (isValidUUID(shop.id)) {
+      channel = supabase
+        .channel('dashboard_chat_updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'chat_threads',
+            filter: `shop_id=eq.${shop.id}`
+          },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+    }
 
     return () => {
       clearInterval(interval);
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [shop.id]);
 

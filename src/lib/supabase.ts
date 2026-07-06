@@ -6,6 +6,12 @@ export const isSupabaseConfigured = (): boolean => {
   return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
 };
 
+export const isValidUUID = (id?: string | null): boolean => {
+  if (!id) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
 export const STORAGE_BUCKETS = {
   LOGOS: 'shop-logos',
   STAFF: 'staff-photos',

@@ -24,13 +24,14 @@ import {
   CloudLightning,
   CheckCircle,
   AlertTriangle,
-  MessageCircle
+  MessageCircle,
+  Gift
 } from 'lucide-react';
 
 import { dbMock, seedOwners } from './lib/dbMock';
 import { syncManager, SyncOperation } from './lib/syncManager';
-import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { Owner, Shop, ScreenType, Booking, Customer, Service, Staff, ChatRoom } from './types';
+import { supabase, isSupabaseConfigured, isValidUUID } from './lib/supabase';
+import { Owner, Shop, ScreenType, Booking, Customer, Service, Staff, ChatThread } from './types';
 
 // Modular Components
 import Splash from './components/Splash';
@@ -46,6 +47,7 @@ import Notifications from './components/Notifications';
 import Profile from './components/Profile';
 import { ChatList } from './components/Chat/ChatList';
 import { ChatDetail } from './components/Chat/ChatDetail';
+import { Rewards } from './components/Rewards';
 
 export default function App() {
   // Navigation & Authentication states
@@ -53,7 +55,7 @@ export default function App() {
   const [owner, setOwner] = useState<Owner | null>(null);
   const [activeShop, setActiveShop] = useState<Shop | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
-  const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null);
+  const [selectedChatThread, setSelectedChatThread] = useState<ChatThread | null>(null);
 
   // Supabase Auth Listener
   useEffect(() => {
@@ -94,6 +96,163 @@ export default function App() {
       clearTimeout(safetyTimer);
     };
   }, []);
+
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [inAppToast, setInAppToast] = useState<{
+    id: string;
+    title: string;
+    message: string;
+    threadId: string;
+    thread: ChatThread;
+  } | null>(null);
+
+  const playNotificationSound = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      
+      const playChime = (time: number, freq: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+        
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.15, time + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.start(time);
+        osc.stop(time + duration);
+      };
+      
+      playChime(ctx.currentTime, 523.25, 0.3); // C5
+      playChime(ctx.currentTime + 0.12, 659.25, 0.4); // E5
+    } catch (err) {
+      console.warn('Audio play failed:', err);
+    }
+  };
+
+  // Live Unread Count State
+  useEffect(() => {
+    if (!activeShop || !isValidUUID(activeShop.id)) {
+      setUnreadChatCount(0);
+      return;
+    }
+
+    const fetchUnreadCount = async () => {
+      try {
+        const isOwner = owner?.role === 'shop_owner';
+        const unreadField = isOwner ? 'owner_unread' : 'customer_unread';
+        
+        const { data, error } = await supabase
+          .from('chat_threads')
+          .select(unreadField)
+          .eq('shop_id', activeShop.id);
+        
+        if (!error && data) {
+          const count = data.reduce((sum, room) => sum + (room[unreadField] || 0), 0);
+          setUnreadChatCount(count);
+        }
+      } catch (err) {
+        console.error('Error fetching unread chat count in App:', err);
+      }
+    };
+
+    fetchUnreadCount();
+
+    const channel = supabase
+      .channel('app_chat_threads_unread')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_threads',
+          filter: `shop_id=eq.${activeShop.id}`
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeShop]);
+
+  // Global message listener for in-app / push notifications
+  useEffect(() => {
+    if (!activeShop || !isValidUUID(activeShop.id)) return;
+
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    const channel = supabase
+      .channel('app_all_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages'
+        },
+        async (payload) => {
+          const newMsg = payload.new;
+          if (newMsg.sender_role === 'customer') {
+            const { data: thread } = await supabase
+              .from('chat_threads')
+              .select('*')
+              .eq('id', newMsg.thread_id)
+              .single();
+
+            if (thread && thread.shop_id === activeShop.id) {
+              const isInThisChat = screen === 'chat_detail' && selectedChatThread?.id === thread.id;
+              if (!isInThisChat) {
+                playNotificationSound();
+
+                setInAppToast({
+                  id: Math.random().toString(),
+                  title: thread.customer_name || 'New Message',
+                  message: newMsg.message || 'Sent an attachment',
+                  threadId: thread.id,
+                  thread: thread
+                });
+
+                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                  new Notification(thread.customer_name || 'New Message', {
+                    body: newMsg.message_text || 'Sent an attachment',
+                    icon: activeShop.logo_url || undefined
+                  });
+                }
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeShop, screen, selectedChatThread]);
+
+  useEffect(() => {
+    if (inAppToast) {
+      const timer = setTimeout(() => {
+        setInAppToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [inAppToast]);
 
   const handleRoleBasedRouting = async (userId: string, email: string) => {
     try {
@@ -164,9 +323,9 @@ export default function App() {
       const role = roleData.role;
 
       // 2. ROLE ROUTING LOGIC
-      if (role === 'customer') {
-        window.location.href = 'https://nexora.in/customer-app';
-        return;
+      if (role === 'customer' || role === 'shop_owner') {
+        // Stay in app for both roles now
+        console.log(`User logged in as ${role}`);
       } else if (role === 'super_admin') {
         window.location.href = 'https://nexora.in/admin-dashboard';
         return;
@@ -185,7 +344,7 @@ export default function App() {
         email: email,
         name: profile?.full_name || email.split('@')[0],
         phone: profile?.phone || '',
-        role: 'shop_owner'
+        role: role || 'shop_owner'
       };
       setOwner(ownerObj);
       dbMock.setLoggedInOwner(ownerObj);
@@ -300,6 +459,13 @@ export default function App() {
   }, [activeShop]);
 
   const handleTriggerSync = async (shopId: string) => {
+    if (!isValidUUID(shopId)) {
+      const remaining = syncManager.getQueue().filter(op => op.shopId !== shopId);
+      localStorage.setItem('nexora_pending_sync_queue', JSON.stringify(remaining));
+      window.dispatchEvent(new CustomEvent('sync-queue-changed', { detail: { count: remaining.length } }));
+      return;
+    }
+
     const queue = syncManager.getQueue().filter(op => op.shopId === shopId);
     if (queue.length === 0) return;
 
@@ -822,6 +988,69 @@ export default function App() {
                 </button>
               </motion.div>
             )}
+
+            {inAppToast && (
+              <motion.div
+                initial={{ opacity: 0, y: -100, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -100, scale: 0.95 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 120 }}
+                onClick={() => {
+                  setSelectedChatThread(inAppToast.thread);
+                  setScreen('chat_detail');
+                  setInAppToast(null);
+                }}
+                className="absolute top-14 left-3 right-3 z-50 bg-white text-slate-800 p-3.5 rounded-2xl shadow-2xl border border-blue-100 flex items-start gap-3 cursor-pointer hover:bg-slate-50 transition-all select-none"
+              >
+                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
+                  {inAppToast.title.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-black text-slate-900 truncate">
+                      {inAppToast.title}
+                    </h5>
+                    <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Chat Msg
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-600 mt-0.5 truncate leading-relaxed">
+                    {inAppToast.message}
+                  </p>
+                  <div className="mt-2 flex gap-1.5">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedChatThread(inAppToast.thread);
+                        setScreen('chat_detail');
+                        setInAppToast(null);
+                      }}
+                      className="bg-blue-600 text-white text-[9px] font-black px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+                    >
+                      Open Chat
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInAppToast(null);
+                      }}
+                      className="bg-slate-100 text-slate-700 text-[9px] font-black px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInAppToast(null);
+                  }}
+                  className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg self-center shrink-0 transition-colors"
+                >
+                  <X className="w-4.5 h-4.5" />
+                </button>
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {/* Core App Screens Dynamic Rendering */}
@@ -958,25 +1187,29 @@ export default function App() {
                 )}
 
                 {/* 20. Chat Screens */}
-                {screen === 'chat_list' && activeShop && (
+                {screen === 'chat_list' && activeShop && owner && (
                   <ChatList
                     shop={activeShop}
                     onBack={() => setScreen('home')}
-                    onSelectRoom={(room) => {
-                      setSelectedChatRoom(room);
+                    onSelectThread={(thread) => {
+                      setSelectedChatThread(thread);
                       setScreen('chat_detail');
                     }}
-                    isShopOwner={!!owner}
+                    isShopOwner={owner.role === 'shop_owner'}
                   />
                 )}
 
-                {screen === 'chat_detail' && activeShop && selectedChatRoom && (
+                {screen === 'chat_detail' && activeShop && selectedChatThread && (
                   <ChatDetail
-                    room={selectedChatRoom}
+                    thread={selectedChatThread}
                     shop={activeShop}
                     onBack={() => setScreen('chat_list')}
-                    isShopOwner={!!owner}
+                    isShopOwner={owner.role === 'shop_owner'}
                   />
+                )}
+
+                {screen === 'rewards' && activeShop && (
+                  <Rewards shop={activeShop} onNavigateTo={navigateTo} />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -984,7 +1217,7 @@ export default function App() {
 
           {/* STICKY BOTTOM NAVIGATION BAR */}
           {/* Only render navigation if logged in and managing a shop */}
-          {owner && activeShop && ['home', 'bookings', 'customers', 'wallet', 'profile', 'services', 'staff', 'help', 'chat_list'].includes(screen) && (
+          {owner && activeShop && ['home', 'bookings', 'customers', 'wallet', 'profile', 'services', 'staff', 'help', 'chat_list', 'rewards'].includes(screen) && (
             <div className="h-20 bg-white border-t border-[#E2E8F0] flex items-center justify-between px-8 pb-4 z-40 select-none relative">
               <button
                 onClick={() => setScreen('home')}
@@ -997,16 +1230,6 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => setScreen('chat_list')}
-                className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
-                  screen === 'chat_list' || screen === 'chat_detail' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <MessageCircle className="w-5 h-5" />
-                <span className="text-[10px] font-bold">Chat</span>
-              </button>
-
-              <button
                 onClick={() => setScreen('bookings')}
                 className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
                   screen === 'bookings' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
@@ -1016,25 +1239,56 @@ export default function App() {
                 <span className="text-[10px] font-bold">Bookings</span>
               </button>
 
-              <button
-                onClick={() => setScreen('customers')}
-                className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
-                  screen === 'customers' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <Users className="w-5 h-5" />
-                <span className="text-[10px] font-bold">Customers</span>
-              </button>
+              {owner.role === 'shop_owner' && (
+                <button
+                  onClick={() => setScreen('customers')}
+                  className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
+                    screen === 'customers' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
+                  }`}
+                >
+                  <Users className="w-5 h-5" />
+                  <span className="text-[10px] font-bold">Customers</span>
+                </button>
+              )}
 
               <button
-                onClick={() => setScreen('wallet')}
-                className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
-                  screen === 'wallet' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
+                onClick={() => setScreen('chat_list')}
+                className={`flex flex-col items-center gap-1 flex-1 transition-colors relative ${
+                  screen === 'chat_list' || screen === 'chat_detail' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
                 }`}
               >
-                <WalletIcon className="w-5 h-5" />
-                <span className="text-[10px] font-bold">Wallet</span>
+                <div className="relative">
+                  <MessageCircle className="w-5 h-5" />
+                  {unreadChatCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-black h-4 min-w-4 px-1 rounded-full flex items-center justify-center border border-white animate-pulse">
+                      {unreadChatCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-bold">Chat</span>
               </button>
+
+              {owner.role === 'shop_owner' ? (
+                <button
+                  onClick={() => setScreen('wallet')}
+                  className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
+                    screen === 'wallet' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
+                  }`}
+                >
+                  <WalletIcon className="w-5 h-5" />
+                  <span className="text-[10px] font-bold">Wallet</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setScreen('rewards')}
+                  className={`flex flex-col items-center gap-1 flex-1 transition-colors ${
+                    screen === 'rewards' ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#0F172A]'
+                  }`}
+                >
+                  <Gift className="w-5 h-5" />
+                  <span className="text-[10px] font-bold">Rewards</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setScreen('profile')}

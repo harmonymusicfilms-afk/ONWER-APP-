@@ -1,5 +1,5 @@
 import { dbMock } from './dbMock';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, isValidUUID } from './supabase';
 
 export interface SyncOperation {
   id: string;
@@ -69,6 +69,14 @@ export const syncManager = {
 
   // Execute sync queue (push to Supabase)
   syncPendingChanges: async (shopId: string): Promise<number> => {
+    if (!isValidUUID(shopId)) {
+      // If it's a mock/offline shop, clear its queue immediately so it doesn't linger
+      const remaining = syncManager.getQueue().filter(op => op.shopId !== shopId);
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
+      window.dispatchEvent(new CustomEvent('sync-queue-changed', { detail: { count: remaining.length } }));
+      return 0;
+    }
+
     if (syncManager.isOffline()) {
       throw new Error('Cannot sync while offline');
     }
@@ -188,7 +196,7 @@ export const syncManager = {
 
   // Pull data from Supabase to refresh LocalStorage cache
   pullFromCloud: async (shopId: string) => {
-    if (syncManager.isOffline() || !isSupabaseConfigured()) return;
+    if (syncManager.isOffline() || !isSupabaseConfigured() || !isValidUUID(shopId)) return;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -261,7 +269,7 @@ export const syncManager = {
 
   // Realtime Subscriptions
   subscribeToChanges: (shopId: string) => {
-    if (!isSupabaseConfigured()) return () => {};
+    if (!isSupabaseConfigured() || !isValidUUID(shopId)) return () => {};
 
     const channel = supabase
       .channel(`shop-changes-${shopId}`)

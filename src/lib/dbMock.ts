@@ -33,7 +33,9 @@ const KEYS = {
   NOTIFICATIONS: 'nexora_notifications',
   ACTIVE_SHOP_ID: 'nexora_active_shop_id',
   WALLETS: 'nexora_wallets',
-  REVIEWS: 'nexora_reviews'
+  REVIEWS: 'nexora_reviews',
+  CHAT_THREADS: 'nexora_chat_threads',
+  CHAT_MESSAGES: 'nexora_chat_messages'
 };
 
 // Initial Data Seeds
@@ -301,6 +303,12 @@ const initDB = () => {
   }
   if (!localStorage.getItem(KEYS.REVIEWS)) {
     localStorage.setItem(KEYS.REVIEWS, JSON.stringify(seedReviews));
+  }
+  if (!localStorage.getItem(KEYS.CHAT_THREADS)) {
+    localStorage.setItem(KEYS.CHAT_THREADS, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(KEYS.CHAT_MESSAGES)) {
+    localStorage.setItem(KEYS.CHAT_MESSAGES, JSON.stringify([]));
   }
   // Let's pre-load default logged-in owner for quick access/testing!
   if (!localStorage.getItem(KEYS.OWNER)) {
@@ -843,6 +851,57 @@ export const dbMock = {
   getWallet: (shopId: string) => {
     const wallets = dbMock.getWalletsRaw();
     return wallets.find(w => w.shop_id === shopId) || { shop_id: shopId, total_earned: 0, pending_settlement: 0, last_payout_amount: 0, last_payout_date: '' };
+  },
+
+  // Chat methods
+  getChatThreads: (shopId: string) => {
+    const threads = JSON.parse(localStorage.getItem(KEYS.CHAT_THREADS) || '[]');
+    return threads.filter((t: any) => t.shop_id === shopId);
+  },
+
+  getChatMessages: (threadId: string) => {
+    const messages = JSON.parse(localStorage.getItem(KEYS.CHAT_MESSAGES) || '[]');
+    return messages.filter((m: any) => m.thread_id === threadId);
+  },
+
+  saveChatMessage: (shopId: string, message: any) => {
+    const messages = JSON.parse(localStorage.getItem(KEYS.CHAT_MESSAGES) || '[]');
+    const newMessage = {
+      ...message,
+      id: message.id || `msg-${uuid()}`,
+      created_at: new Date().toISOString()
+    };
+    messages.push(newMessage);
+    localStorage.setItem(KEYS.CHAT_MESSAGES, JSON.stringify(messages));
+
+    // Update thread
+    const threads = JSON.parse(localStorage.getItem(KEYS.CHAT_THREADS) || '[]');
+    const threadIdx = threads.findIndex((t: any) => t.id === message.thread_id);
+    if (threadIdx > -1) {
+      threads[threadIdx].last_message = message.message_text || 'Sent an attachment';
+      threads[threadIdx].last_message_at = newMessage.created_at;
+      if (message.sender_role === 'customer') {
+        threads[threadIdx].owner_unread = (threads[threadIdx].owner_unread || 0) + 1;
+      } else {
+        threads[threadIdx].customer_unread = (threads[threadIdx].customer_unread || 0) + 1;
+      }
+      localStorage.setItem(KEYS.CHAT_THREADS, JSON.stringify(threads));
+    }
+
+    return newMessage;
+  },
+
+  markChatRead: (threadId: string, role: 'owner' | 'customer') => {
+    const threads = JSON.parse(localStorage.getItem(KEYS.CHAT_THREADS) || '[]');
+    const threadIdx = threads.findIndex((t: any) => t.id === threadId);
+    if (threadIdx > -1) {
+      if (role === 'owner') {
+        threads[threadIdx].owner_unread = 0;
+      } else {
+        threads[threadIdx].customer_unread = 0;
+      }
+      localStorage.setItem(KEYS.CHAT_THREADS, JSON.stringify(threads));
+    }
   },
 
   saveShop: (shopId: string, data: Partial<Shop>) => {

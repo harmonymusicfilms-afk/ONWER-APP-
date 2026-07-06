@@ -1,72 +1,166 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ArrowLeft, 
   Send, 
   Image as ImageIcon, 
   MoreVertical,
-  User,
   Paperclip,
   Check,
   CheckCheck,
   Phone,
-  MessageCircle
+  Video,
+  Smile,
+  X,
+  Download,
+  Camera,
+  Mic,
+  Calendar,
+  Search,
+  Reply,
+  Forward,
+  Copy,
+  Star,
+  Trash2,
+  MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
-import { ChatRoom, ChatMessage, Shop } from '../../types';
-import { format } from 'date-fns';
+import { ChatThread, ChatMessage, Shop } from '../../types';
+import { format, isToday, isYesterday } from 'date-fns';
+import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
+import { useClickAway } from 'react-use';
 
 interface ChatDetailProps {
-  room: ChatRoom;
+  thread: ChatThread;
   shop: Shop;
   onBack: () => void;
   isShopOwner: boolean;
 }
 
-export const ChatDetail: React.FC<ChatDetailProps> = ({ room, shop, onBack, isShopOwner }) => {
+export const ChatDetail: React.FC<ChatDetailProps> = ({ thread, shop, onBack, isShopOwner }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const scrollRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  useClickAway(emojiPickerRef, () => setShowEmojiPicker(false));
+
+  const primaryBg = isShopOwner ? 'bg-[#2563EB]' : 'bg-[#7C3AED]';
+  const primaryText = isShopOwner ? 'text-[#2563EB]' : 'text-[#7C3AED]';
 
   useEffect(() => {
     fetchMessages();
-    markRoomAsRead();
+    markAsRead();
 
-    // Subscribe to new messages
-    const channel = supabase
-      .channel(`thread_${room.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `thread_id=eq.${room.id}`
+    // Subscribe to messages and presence
+    const channel = supabase.channel(`thread:${thread.id}`, {
+      config: {
+        presence: {
+          key: isShopOwner ? 'owner' : 'customer',
         },
-        (payload) => {
-          const msg = payload.new as ChatMessage;
-          setMessages(prev => [...prev, msg]);
-          if (msg.sender_id !== (supabase.auth.getUser() as any).data.user?.id) {
-            markRoomAsRead();
-          }
+      },
+    });
+
+    channel
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `thread_id=eq.${thread.id}`
+      }, (payload) => {
+        const msg = payload.new as ChatMessage;
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        
+        // Play subtle sound if not from me
+        const isMe = isShopOwner ? msg.sender_role === 'shop_owner' : msg.sender_role === 'customer';
+        if (!isMe) {
+          playNotificationSound();
+          markAsRead();
         }
-      )
-      .subscribe();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `thread_id=eq.${thread.id}`
+      }, (payload) => {
+        const updatedMsg = payload.new as ChatMessage;
+        setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+      })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const otherRole = isShopOwner ? 'customer' : 'shop_owner';
+        const otherPresence = state[otherRole] as any[];
+        
+        setIsOnline(!!otherPresence?.length);
+        if (otherPresence?.length) {
+          setIsOtherTyping(otherPresence.some(p => p.is_typing));
+        }
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        if (key === (isShopOwner ? 'customer' : 'shop_owner')) {
+          setIsOnline(true);
+        }
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        if (key === (isShopOwner ? 'customer' : 'shop_owner')) {
+          setIsOnline(false);
+          setLastSeen(new Date().toISOString());
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            online_at: new Date().toISOString(),
+            is_typing: false
+          });
+        }
+      });
+
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
-  }, [room.id]);
+  }, [thread.id]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isOtherTyping]);
+
+  const playNotificationSound = () => {
+    // Standard subtle "pop" or "ping"
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+      audio.volume = 0.2;
+      audio.play();
+    } catch (e) {}
+  };
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   };
 
@@ -75,7 +169,7 @@ export const ChatDetail: React.FC<ChatDetailProps> = ({ room, shop, onBack, isSh
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
-        .eq('room_id', room.id)
+        .eq('thread_id', thread.id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -87,52 +181,59 @@ export const ChatDetail: React.FC<ChatDetailProps> = ({ room, shop, onBack, isSh
     }
   };
 
-  const markRoomAsRead = async () => {
+  const markAsRead = async () => {
     try {
+      const unreadField = isShopOwner ? 'owner_unread' : 'customer_unread';
       await supabase
-        .from('chat_rooms')
-        .update({ unread_count_shop: 0 })
-        .eq('id', room.id);
+        .from('chat_threads')
+        .update({ [unreadField]: 0 })
+        .eq('id', thread.id);
+
+      // Also mark messages as read
+      await supabase
+        .from('chat_messages')
+        .update({ is_read: true })
+        .eq('thread_id', thread.id)
+        .neq('sender_role', isShopOwner ? 'owner' : 'customer');
     } catch (err) {
-      console.error('Error marking room as read:', err);
+      console.error('Error marking as read:', err);
     }
   };
 
-  const handleQuickReply = async (replyText: string) => {
-    await sendMessage(replyText);
-  };
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newMessage.trim() || sending) return;
 
-  const sendMessage = async (messageText: string) => {
+    const messageText = newMessage.trim();
+    setNewMessage('');
     setSending(true);
+    setReplyingTo(null);
+
     try {
-      const { error } = await supabase
+      const { data: newMsg, error } = await supabase
         .from('chat_messages')
         .insert({
-          thread_id: room.id,
-          message_text: messageText,
-          sender_role: isShopOwner ? 'shop_owner' : 'customer',
-          sender_id: (await supabase.auth.getUser()).data.user?.id
-        });
+          thread_id: thread.id,
+          message: messageText,
+          message_type: 'text',
+          sender_id: (await supabase.auth.getUser()).data.user?.id,
+          sender_role: isShopOwner ? 'owner' : 'customer',
+          reply_to_id: replyingTo?.id
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      await supabase.from('notifications').insert({
-        shop_id: shop.id,
-        title: isShopOwner ? `New message from ${room.customer_name}` : `New reply from shop`,
-        message: messageText,
-        type: 'system'
-      });
-
-      // Update last message in thread
+      // Update thread last message
       await supabase
         .from('chat_threads')
         .update({
           last_message: messageText,
           last_message_at: new Date().toISOString(),
-          customer_unread_count: isShopOwner ? (room.customer_unread_count || 0) + 1 : 0,
-          owner_unread_count: !isShopOwner ? (room.owner_unread_count || 0) + 1 : 0
+          [isShopOwner ? 'customer_unread' : 'owner_unread']: supabase.rpc('increment_unread', { t_id: thread.id, role: isShopOwner ? 'customer' : 'owner' })
         })
-        .eq('id', room.id);
+        .eq('id', thread.id);
 
     } catch (err) {
       console.error('Error sending message:', err);
@@ -141,12 +242,26 @@ export const ChatDetail: React.FC<ChatDetailProps> = ({ room, shop, onBack, isSh
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!newMessage.trim() || sending) return;
-    const messageText = newMessage.trim();
-    setNewMessage('');
-    await sendMessage(messageText);
+  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    
+    if (channelRef.current) {
+      channelRef.current.track({
+        online_at: new Date().toISOString(),
+        is_typing: true
+      });
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      if (channelRef.current) {
+        channelRef.current.track({
+          online_at: new Date().toISOString(),
+          is_typing: false
+        });
+      }
+    }, 2000);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,141 +269,292 @@ export const ChatDetail: React.FC<ChatDetailProps> = ({ room, shop, onBack, isSh
     if (!file) return;
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${room.id}/${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('chat-images')
-        .upload(fileName, file);
+      setSending(true);
+      const path = `chat/${thread.id}/${Date.now()}_${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('chat-media')
+        .upload(path, file);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(path);
 
       await supabase
         .from('chat_messages')
         .insert({
-          thread_id: room.id,
+          thread_id: thread.id,
           message_type: 'image',
-          image_url: data.publicUrl,
-          sender_role: isShopOwner ? 'shop_owner' : 'customer',
-          sender_id: (await supabase.auth.getUser()).data.user?.id
+          image_url: publicUrl,
+          sender_id: (await supabase.auth.getUser()).data.user?.id,
+          sender_role: isShopOwner ? 'owner' : 'customer'
         });
-      
+
     } catch (err) {
-      console.error('Image upload failed:', err);
+      console.error('Upload failed:', err);
+    } finally {
+      setSending(false);
     }
   };
 
+  const formatMessageTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return format(date, 'HH:mm');
+  };
+
+  const groupMessages = useMemo(() => {
+    const groups: { [key: string]: ChatMessage[] } = {};
+    messages.forEach(msg => {
+      const date = new Date(msg.created_at);
+      let dateKey = '';
+      if (isToday(date)) dateKey = 'Today';
+      else if (isYesterday(date)) dateKey = 'Yesterday';
+      else dateKey = format(date, 'MMMM d, yyyy');
+      
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(msg);
+    });
+    return groups;
+  }, [messages]);
+
   return (
-    <div className="flex flex-col h-full bg-slate-100">
+    <div className="flex flex-col h-full bg-[#E5DDD5] relative overflow-hidden">
+      {/* Background Pattern (WhatsApp like) */}
+      <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
+
       {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between border-b sticky top-0 z-10 shadow-sm">
+      <div className="bg-[#F0F2F5] px-4 py-2.5 flex items-center justify-between border-b border-black/5 z-20 shadow-sm">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={onBack}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6 text-slate-600" />
+          <button onClick={onBack} className="p-1 hover:bg-black/5 rounded-full text-[#54656F]">
+            <ArrowLeft className="w-6 h-6" />
           </button>
+          
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-              <User className="w-6 h-6 text-indigo-600" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm ${primaryBg}`}>
+              {isShopOwner ? (
+                thread.customer_name?.charAt(0).toUpperCase() || 'C'
+              ) : (
+                shop.name.charAt(0).toUpperCase()
+              )}
             </div>
-            <div>
-              <h2 className="font-bold text-slate-900 leading-tight">
-                {room.customer_name}
+            
+            <div className="flex flex-col">
+              <h2 className="font-semibold text-[#111B21] text-sm leading-tight">
+                {isShopOwner ? thread.customer_name : shop.name}
               </h2>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Online</span>
+              <div className="flex items-center gap-1.5 h-4">
+                {isOtherTyping ? (
+                  <span className="text-[11px] text-[#00A884] font-medium animate-pulse">typing...</span>
+                ) : isOnline ? (
+                  <span className="text-[11px] text-[#00A884] font-medium">online</span>
+                ) : lastSeen ? (
+                  <span className="text-[11px] text-[#667781]">last seen {format(new Date(lastSeen), 'HH:mm')}</span>
+                ) : null}
               </div>
             </div>
           </div>
         </div>
+        
         <div className="flex items-center gap-1">
-          {room.customer_phone && (
-            <a 
-              href={`tel:${room.customer_phone}`}
-              className="p-2 hover:bg-slate-100 rounded-full text-slate-600"
-            >
-              <Phone className="w-5 h-5" />
-            </a>
-          )}
-          <button className="p-2 hover:bg-slate-100 rounded-full text-slate-600">
+          <button className="p-2 hover:bg-black/5 rounded-full text-[#54656F]">
+            <Video className="w-5 h-5" />
+          </button>
+          <button className="p-2 hover:bg-black/5 rounded-full text-[#54656F]">
+            <Phone className="w-5 h-5" />
+          </button>
+          <button className="p-2 hover:bg-black/5 rounded-full text-[#54656F]">
             <MoreVertical className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages area */}
       <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 flex flex-col gap-3"
+        ref={scrollRef} 
+        className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-2 z-10 scrollbar-thin scrollbar-thumb-black/10"
       >
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-10">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
-              <MessageCircle className="w-8 h-8 text-indigo-400" />
+        {Object.entries(groupMessages).map(([date, dateMessages]) => (
+          <React.Fragment key={date}>
+            <div className="flex justify-center my-4">
+              <div className="bg-[#FFFFFF] px-3 py-1 rounded-lg shadow-sm text-[11px] font-medium text-[#54656F] uppercase tracking-wider border border-black/5">
+                {date}
+              </div>
             </div>
-            <p className="text-slate-500 text-sm">
-              No messages yet. Send a message to start the conversation!
-            </p>
-          </div>
-        ) : (
-          messages.map((msg, idx) => {
-            const isMe = isShopOwner ? msg.sender_role === 'shop_owner' : msg.sender_role === 'customer';
-            const showDate = idx === 0 || format(new Date(messages[idx-1].created_at), 'yyyy-MM-dd') !== format(new Date(msg.created_at), 'yyyy-MM-dd');
-
-            return (
-              <React.Fragment key={msg.id}>
-                {showDate && (
-                  <div className="flex justify-center my-4">
-                    <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter">
-                      {format(new Date(msg.created_at), 'MMMM dd, yyyy')}
-                    </span>
-                  </div>
-                )}
-                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div 
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm relative ${
-                      isMe 
-                        ? 'bg-indigo-600 text-white rounded-tr-none' 
-                        : 'bg-white text-slate-800 rounded-tl-none border border-slate-200'
-                    }`}
-                  >
-                    {msg.message_type === 'text' ? (
-                      <p className="text-sm leading-relaxed">{msg.message_text}</p>
-                    ) : (
-                      <img src={msg.image_url || ''} alt="chat" className="max-w-full rounded-lg" />
+            
+            {(dateMessages as ChatMessage[]).map((msg, idx) => {
+              const isMe = isShopOwner ? msg.sender_role === 'shop_owner' : msg.sender_role === 'customer';
+              const showTail = idx === 0 || (dateMessages as ChatMessage[])[idx-1].sender_role !== msg.sender_role;
+              
+              return (
+                <motion.div 
+                  key={msg.id}
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}
+                >
+                  <div className={`group relative max-w-[85%] px-3 py-1.5 rounded-xl shadow-sm ${
+                    isMe 
+                      ? 'bg-[#D9FDD3] text-[#111B21] rounded-tr-none' 
+                      : 'bg-white text-[#111B21] rounded-tl-none'
+                  }`}>
+                    {/* Reply Context */}
+                    {msg.reply_to_id && (
+                      <div className="bg-black/5 rounded-md p-2 mb-1 border-l-4 border-emerald-500 overflow-hidden">
+                        <p className="text-[10px] font-bold text-emerald-600">Replied Message</p>
+                        <p className="text-[11px] text-[#54656F] truncate">
+                          {messages.find(m => m.id === msg.reply_to_id)?.message || 'Image Attachment'}
+                        </p>
+                      </div>
                     )}
-                    <div className={`flex items-center gap-1 justify-end mt-1 ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
-                      <span className="text-[10px]">
-                        {format(new Date(msg.created_at), 'hh:mm a')}
+
+                    {msg.message_type === 'text' && (
+                      <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap">
+                        {msg.message}
+                      </p>
+                    )}
+
+                    {msg.message_type === 'image' && (
+                      <div className="rounded-lg overflow-hidden my-1 bg-black/5 min-h-[150px] flex items-center justify-center">
+                        <img 
+                          src={msg.image_url} 
+                          alt="shared" 
+                          className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setSelectedImage(msg.image_url!)}
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            if (img.complete) scrollToBottom();
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-1 mt-0.5 ml-8">
+                      <span className="text-[10px] text-[#667781] font-medium uppercase">
+                        {formatMessageTime(msg.created_at)}
                       </span>
                       {isMe && (
-                        msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
+                        msg.is_read ? (
+                          <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
+                        ) : (
+                          <CheckCheck className="w-3.5 h-3.5 text-[#667781]" />
+                        )
                       )}
                     </div>
+
+                    {/* Quick Action Overlay */}
+                    <div className={`absolute top-0 ${isMe ? '-left-8' : '-right-8'} opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1`}>
+                      <button 
+                        onClick={() => setReplyingTo(msg)}
+                        className="p-1 bg-white rounded-full shadow-md text-[#54656F] hover:text-[#111B21]"
+                      >
+                        <Reply className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1 bg-white rounded-full shadow-md text-[#54656F] hover:text-[#111B21]">
+                        <Star className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </React.Fragment>
-            );
-          })
-        )}
+                </motion.div>
+              );
+            })}
+          </React.Fragment>
+        ))}
       </div>
 
-      {/* Quick Replies */}
-      {isShopOwner && (
-        <div className="px-4 py-2 bg-slate-50 border-t flex gap-2 overflow-x-auto">
-          {['Yes, slot available.', 'Please select service.', 'Please share location.', 'Your booking is confirmed.', 'Please arrive 10 minutes early.'].map((reply) => (
-            <button 
+      {/* Input Area */}
+      <div className="bg-[#F0F2F5] p-3 border-t border-black/5 z-20">
+        {/* Reply Preview */}
+        <AnimatePresence>
+          {replyingTo && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-white/80 backdrop-blur-md rounded-xl p-3 mb-2 border-l-4 border-emerald-500 flex justify-between items-center"
+            >
+              <div className="overflow-hidden">
+                <p className="text-[11px] font-bold text-emerald-600">Replying to {replyingTo.sender_role}</p>
+                <p className="text-xs text-[#54656F] truncate">{replyingTo.message || 'Image Attachment'}</p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-black/5 rounded-full">
+                <X className="w-4 h-4 text-[#54656F]" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <div className="relative" ref={emojiPickerRef}>
+              <button 
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="p-2 text-[#54656F] hover:bg-black/5 rounded-full"
+              >
+                <Smile className="w-6 h-6" />
+              </button>
+              {showEmojiPicker && (
+                <div className="absolute bottom-12 left-0 z-50">
+                  <EmojiPicker 
+                    onEmojiClick={(e) => {
+                      setNewMessage(prev => prev + e.emoji);
+                      setShowEmojiPicker(false);
+                    }}
+                    theme={EmojiTheme.LIGHT}
+                    skinTonesDisabled
+                    width={300}
+                    height={400}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <label className="p-2 text-[#54656F] hover:bg-black/5 rounded-full cursor-pointer">
+              <Paperclip className="w-6 h-6" />
+              <input type="file" className="hidden" onChange={handleImageUpload} />
+            </label>
+          </div>
+
+          <form onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
+            <div className="flex-1 bg-white rounded-xl px-4 py-2 shadow-sm border border-black/5">
+              <input 
+                type="text"
+                placeholder="Type a message"
+                value={newMessage}
+                onChange={handleTyping}
+                className="w-full bg-transparent border-none outline-none text-[15px] text-[#111B21] placeholder:text-[#667781]"
+              />
+            </div>
+            
+            {newMessage.trim() ? (
+              <button 
+                type="submit"
+                disabled={sending}
+                className={`w-11 h-11 rounded-full text-white flex items-center justify-center shadow-md transition-all active:scale-90 ${primaryBg}`}
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            ) : (
+              <button 
+                type="button"
+                className="w-11 h-11 rounded-full bg-[#00A884] text-white flex items-center justify-center shadow-md"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+
+      {/* Quick Reply Chips */}
+      {!newMessage.trim() && (
+        <div className="bg-[#F0F2F5] px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide z-20">
+          {(isShopOwner ? ownerQuickReplies : customerQuickReplies).map(reply => (
+            <button
               key={reply}
-              onClick={() => handleQuickReply(reply)}
-              className="whitespace-nowrap bg-white text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
+              onClick={() => {
+                setNewMessage(reply);
+                // Trigger auto send if needed or just fill input
+              }}
+              className="bg-white border border-black/5 text-[#54656F] text-[11px] font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-sm hover:bg-[#F0F2F5] transition-colors"
             >
               {reply}
             </button>
@@ -296,47 +562,45 @@ export const ChatDetail: React.FC<ChatDetailProps> = ({ room, shop, onBack, isSh
         </div>
       )}
 
-      {/* Input */}
-      <div className="bg-white p-4 border-t sticky bottom-0">
-        <form 
-          onSubmit={handleSendMessage}
-          className="flex items-center gap-2 bg-slate-100 rounded-2xl px-2 py-1"
-        >
-          <div className="flex items-center gap-1">
-            <label className="p-2 hover:bg-slate-200 rounded-full cursor-pointer transition-colors text-slate-500">
-              <ImageIcon className="w-5 h-5" />
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            </label>
-            <button 
-              type="button"
-              className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
-            >
-              <Paperclip className="w-5 h-5" />
+      {/* Image Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black/95 z-[100] flex flex-col p-4">
+          <div className="flex justify-between items-center mb-4">
+            <button onClick={() => setSelectedImage(null)} className="p-2 text-white hover:bg-white/10 rounded-full">
+              <X className="w-6 h-6" />
             </button>
+            <div className="flex gap-2">
+              <button className="p-2 text-white hover:bg-white/10 rounded-full">
+                <Download className="w-6 h-6" />
+              </button>
+              <button className="p-2 text-white hover:bg-white/10 rounded-full">
+                <Forward className="w-6 h-6" />
+              </button>
+            </div>
           </div>
-          
-          <input
-            type="text"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-sm text-slate-800 placeholder:text-slate-400"
-          />
-
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className={`p-3 rounded-xl transition-all ${
-              newMessage.trim() && !sending
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
-                : 'bg-slate-200 text-slate-400'
-            }`}
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </form>
-      </div>
+          <div className="flex-1 flex items-center justify-center">
+            <img src={selectedImage} alt="Fullscreen" className="max-w-full max-h-full object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
+const ownerQuickReplies = [
+  'Welcome to our shop!',
+  'How can I help you?',
+  'Slot is available at 2 PM',
+  'Price for haircut is ₹300',
+  'We are closed on Mondays',
+  'Sure, looking forward!'
+];
+
+const customerQuickReplies = [
+  'I want to book a slot',
+  'What is the price?',
+  'Is slot available today?',
+  'Share shop location',
+  'Thank you!',
+  'Can I cancel?'
+];
